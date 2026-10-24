@@ -48,8 +48,19 @@ page_head('首页'); ?>
             <?php if($p['is_anon']): ?><span class="anon-tag">匿名</span>
             <?php else: ?><img src="<?=h($p['avatar'] ?: 'assets/default.png')?>"><a href="profile.php?uid=<?=$p['uid']?>"><?=h(show_name($p))?></a><?php endif; ?>
             · <?=h($p['created_at'])?>
-            <?php if($is_admin || $is_owner): ?><a href="?action=delete_post&pid=<?=$p['pid']?>" onclick="return confirm('删帖？')" style="color:red;float:right">删除</a><?php endif; ?>
+            
+            <span style="margin-left:auto">
+                <?php if($is_admin || $is_owner): ?>
+                    <!-- 开关评论区 -->
+                    <a href="?action=toggle_comments&pid=<?=$p['pid']?>" style="color:var(--gray);margin-right:8px;">
+                        <?=$p['closed'] ? '打开评论区' : '关闭评论区'?>
+                    </a>
+                    <!-- 删帖 -->
+                    <a href="?action=delete_post&pid=<?=$p['pid']?>" onclick="return confirm('删帖？')" style="color:red">删除帖子</a>
+                <?php endif; ?>
+            </span>
         </div>
+        
         <?php if($locked): ?>
             <form method="post" action="?action=unlock_post&pid=<?=$p['pid']?>">
                 <p>密码帖：<input type="text" name="pwd" style="width:120px"> <button type="submit">解锁</button></p>
@@ -57,23 +68,47 @@ page_head('首页'); ?>
         <?php else: ?>
             <div class="md"><?=h($p['content'])?></div>
             <?php foreach($files as $f){ if($f['img']) echo '<img class="post-img" src="'.h($f['path']).'">'; else echo '<a href="'.h($f['path']).'">📎 '.h($f['orig']).'</a>'; } ?>
+            
             <div style="margin-top:10px">
                 <form method="post" action="?action=like" style="display:inline">
                     <input type="hidden" name="pid" value="<?=$p['pid']?>">
                     <button type="submit" class="fl <?=isset($myLikes[$p['pid']])?'red':'gray'?>">❤ <?=$likeCounts[$p['pid']]??0?></button>
                 </form>
             </div>
+
             <div style="margin-top:10px;border-top:1px solid #eee;padding-top:8px">
-                <?php
-                $cstmt = $pdo->prepare('SELECT c.*, u.username, u.nickname FROM comments c JOIN users u ON c.uid = u.uid WHERE c.pid = ? AND c.hidden = 0 ORDER BY c.cid ASC');
-                $cstmt->execute([$p['pid']]);
-                while($c = $cstmt->fetch()){ echo '<div class="meta">'.($c['is_anon']?'匿名':h(show_name($c))).':</div><div class="md">'.h($c['content']).'</div>'; }
+                <?php if($p['closed']): ?>
+                    <p class="hint" style="color:#c00">评论区已关闭</p>
+                <?php else: 
+                    $cstmt = $pdo->prepare('SELECT c.*, u.username, u.nickname, u.avatar FROM comments c JOIN users u ON c.uid = u.uid WHERE c.pid = ? AND c.hidden = 0 ORDER BY c.cid ASC');
+                    $cstmt->execute([$p['pid']]);
+                    while($c = $cstmt->fetch()):
+                        $can_del_c = ($is_admin || $is_owner || ((int)$c['uid'] === $uid));
                 ?>
-                <form method="post" action="?action=comment" style="margin-top:6px">
+                    <div style="margin:8px 0;font-size:13px">
+                        <div class="meta" style="display:inline-flex;margin:0">
+                            <?php if($c['is_anon']): ?>
+                                <span class="anon-tag">匿名</span>
+                            <?php else: ?>
+                                <b><?=h(show_name($c))?></b>
+                            <?php endif; ?>
+                            ：<?=nl2br(h($c['content']))?>
+                            <?php if($can_del_c): ?>
+                                <a href="?action=del_comment&cid=<?=$c['cid']?>" onclick="return confirm('删评论？')" style="color:#dc2626;margin-left:8px;">删除</a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endwhile; ?>
+                
+                <form method="post" action="?action=comment" style="margin-top:10px">
                     <input type="hidden" name="pid" value="<?=$p['pid']?>">
-                    <input type="text" name="content" placeholder="评论..." required>
-                    <button type="submit">发送</button>
+                    <div style="display:flex;gap:6px;align-items:center">
+                        <input type="text" name="content" placeholder="写评论..." required style="flex:1">
+                        <label style="white-space:nowrap;font-size:13px"><input type="checkbox" name="is_anon" value="1"> 匿名</label>
+                        <button type="submit">发送</button>
+                    </div>
                 </form>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
     </div>

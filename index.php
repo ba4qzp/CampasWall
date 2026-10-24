@@ -71,7 +71,8 @@ if($action === 'login'){
     $error = '';
     if($_SERVER['REQUEST_METHOD'] === 'POST'){
         $u = trim($_POST['username'] ?? ''); 
-        $p = $_POST['password'] ?? $_POST['pass'] ?? ''; // 兼容测试字段
+        // 兼容测试脚本的 pass 参数（防止 GitHub 打码导致空密码）
+        $p = $_POST['password'] ?? $_POST['pass'] ?? ''; 
         $stmt = $pdo->prepare('SELECT * FROM users WHERE username = ?'); $stmt->execute([$u]); $user = $stmt->fetch();
         if($user && !password_verify($p, $user['password_hash'])) $user = null;
         if($user){

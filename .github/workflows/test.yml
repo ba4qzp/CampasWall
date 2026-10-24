@@ -16,10 +16,14 @@ jobs:
           MYSQL_DATABASE: phpschool_test
         ports:
           - 3306:3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
@@ -30,35 +34,47 @@ jobs:
     - name: Start PHP Server
       run: |
         php -S 127.0.0.1:8000 &
-        sleep 3
+        sleep 5
 
     - name: Run Install
       run: |
-        # 1. 模拟一键安装
         curl -s -X POST -d "site_name=TestSite&admin_email=a@b.com&admin_user=admin&admin_pass=123456&db_host=127.0.0.1&db_name=phpschool_test&db_user=root&db_pass=root&allow_register=on&require_approval=on&limit_private_msg=on" http://127.0.0.1:8000/install.php?step=2 > install_res.html
-        if [ ! -f .env ]; then echo "❌ 安装失败，未生成 .env"; cat install_res.html; exit 1; fi
-        echo "✅ 安装成功"
+        if [ ! -f .env ]; then 
+          echo "❌ 安装失败！"
+          cat install_res.html
+          exit 1
+        fi
+        echo "✅ 安装成功，.env 已生成"
 
     - name: Test Login & Post
+      env:
+        LANG: C.UTF-8
+        LC_ALL: C.UTF-8
       run: |
-        # 2. 模拟登录 (把 Cookie 保存到 cookies.txt)
+        # 模拟登录
         curl -s -c cookies.txt -X POST -d "username=admin&password=123456" "http://127.0.0.1:8000/index.php?action=login"
         
-        # 3. 模拟发帖 (带上刚才的 Cookie)
-        curl -s -b cookies.txt -X POST -d "content=这是GitHub自动测试发出的帖子&tags=测试" "http://127.0.0.1:8000/index.php?action=post"
+        # 模拟发帖（用 --data-urlencode 发送中文）
+        curl -s -b cookies.txt -X POST \
+          --data-urlencode "content=这是GitHub自动测试发出的中文帖子" \
+          --data-urlencode "tags=中文测试" \
+          "http://127.0.0.1:8000/index.php?action=post"
         
-        echo "✅ 登录和发帖请求已发送"
+        echo "✅ 登录和中文发帖请求已发送"
 
     - name: Verify Database
+      env:
+        LANG: C.UTF-8
+        LC_ALL: C.UTF-8
       run: |
-        # 4. 连上数据库，看看帖子到底存进去没
-        mysql -h 127.0.0.1 -u root -proot phpschool_test -e "SELECT content FROM posts;" > db_res.txt
+        # 连库时强制指定 utf8mb4，查出中文
+        mysql --default-character-set=utf8mb4 -h 127.0.0.1 -u root -proot phpschool_test -e "SELECT content FROM posts;" > db_res.txt
         
-        # 检查查出来的数据里有没有刚才发的内容
-        if grep -q "这是GitHub自动测试发出的帖子" db_res.txt; then
-          echo "✅ 测试通过！帖子成功写入数据库。"
+        # 检查中文是否完好无损
+        if grep -q "这是GitHub自动测试发出的中文帖子" db_res.txt; then
+          echo "✅ 测试通过！中文帖子成功写入数据库且无乱码。"
         else
-          echo "❌ 测试失败！数据库中没找到帖子。"
+          echo "❌ 测试失败！当前数据库内容如下："
           cat db_res.txt
           exit 1
         fi

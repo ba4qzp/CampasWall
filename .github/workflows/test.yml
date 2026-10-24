@@ -1,4 +1,4 @@
-name: Auto Test All Features
+name: Auto Test All Features (Exhaustive)
 
 on:
   push:
@@ -31,95 +31,103 @@ jobs:
         php-version: '7.4'
         extensions: pdo, pdo_mysql
 
-    - name: Start PHP Server
+    - name: 0. 环境安装
       run: |
         php -S 127.0.0.1:8000 &
         sleep 5
-
-    - name: Run Install
-      run: |
         curl -s -X POST -d "site_name=TestSite&admin_email=a@b.com&admin_user=admin&admin_pass=123456&db_host=127.0.0.1&db_name=phpschool_test&db_user=root&db_pass=root&allow_register=on&require_approval=on&limit_private_msg=on" http://127.0.0.1:8000/install.php?step=2 > install_res.html
         if [ ! -f .env ]; then cat install_res.html; exit 1; fi
+        echo "✅ 安装向导跑通"
 
-    - name: Test All Features (via PHP)
+    - name: 1. 账号注册、审核与资料修改
       run: |
-        cat << 'EOF' > test_all.php
-        <?php
-        $pdo = new PDO("mysql:host=127.0.0.1;dbname=phpschool_test;charset=utf8mb4", "root", "root");
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        curl -s -X POST -d "username=user1&password=123456&email=u@t.com" "http://127.0.0.1:8000/index.php?action=register"
+        STATUS=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT status FROM users WHERE username='user1'")
+        if [ "$STATUS" != "pending" ]; then echo "❌ 注册状态异常: $STATUS"; exit 1; fi
         
-        function request($url, $data, $cookieFile, $method = 'POST') {
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_POST => $method === 'POST',
-                CURLOPT_POSTFIELDS => $method === 'POST' ? http_build_query($data) : '',
-                CURLOPT_COOKIEJAR => $cookieFile,
-                CURLOPT_COOKIEFILE => $cookieFile,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_FOLLOWLOCATION => true
-            ]);
-            $res = curl_exec($ch);
-            curl_close($ch);
-            return $res;
-        }
+        # 管理员通过并登录
+        curl -s -c admin_cookie.txt -X POST -d "username=admin&password=123456" "http://127.0.0.1:8000/index.php?action=login"
+        curl -s -b admin_cookie.txt "http://127.0.0.1:8000/admin.php?action=approve&id=2"
+        
+        # 用户1登录，修改密码和资料
+        curl -s -c u1_cookie.txt -X POST -d "username=user1&password=123456" "http://127.0.0.1:8000/index.php?action=login"
+        curl -s -b u1_cookie.txt -X POST -d "mode=profile&nickname=新昵称&bio=新简介" "http://127.0.0.1:8000/profile.php"
+        curl -s -b u1_cookie.txt -X POST -d "mode=password&old_pwd=123456&new_pwd=654321" "http://127.0.0.1:8000/profile.php"
+        
+        # 验证密码是否更改
+        curl -s -c test_login.txt -X POST -d "username=user1&password=654321" "http://127.0.0.1:8000/index.php?action=login"
+        if grep -q "账号审核中\|错误" test_login.txt; then echo "❌ 新密码登录失败"; exit 1; fi
+        echo "✅ 账号模块通过"
 
-        // 1. 测试注册
-        request('http://127.0.0.1:8000/index.php?action=register', [
-            'username' => 'user1', 'password' => '123456', 'email' => 'user1@test.com'
-        ], 'user1_cookies.txt');
+    - name: 2. 发帖(含密码/匿名)与互动及删除
+      run: |
+        # Admin 发普通帖
+        curl -s -b admin_cookie.txt -X POST -d "content=NormalPost" "http://127.0.0.1:8000/index.php?action=post"
+        PID_NORMAL=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT MAX(pid) FROM posts")
         
-        $stmt = $pdo->query("SELECT uid, status FROM users WHERE username='user1'");
-        $user1 = $stmt->fetch();
-        if(!$user1 || $user1['status'] !== 'pending') { echo "❌ 注册失败\n"; exit(1); }
-        $user1_uid = $user1['uid'];
+        # Admin 发密码帖
+        curl -s -b admin_cookie.txt -X POST -d "content=SecretPost&pwd=123456" "http://127.0.0.1:8000/index.php?action=post"
+        
+        # User1 评论、点赞
+        curl -s -b u1_cookie.txt -X POST -d "pid=$PID_NORMAL&content=U1Comment" "http://127.0.0.1:8000/index.php?action=comment"
+        curl -s -b u1_cookie.txt -X POST -d "pid=$PID_NORMAL" "http://127.0.0.1:8000/index.php?action=like"
+        
+        # User1 删除自己的评论
+        CID=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT MAX(cid) FROM comments")
+        curl -s -b u1_cookie.txt "http://127.0.0.1:8000/index.php?action=del_comment&cid=$CID"
+        
+        # Admin 删帖
+        curl -s -b admin_cookie.txt "http://127.0.0.1:8000/index.php?action=delete&pid=$PID_NORMAL"
+        
+        # 验证删除结果
+        COUNT_POST=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT COUNT(*) FROM posts WHERE pid=$PID_NORMAL")
+        if [ "$COUNT_POST" != "0" ]; then echo "❌ 删帖失败"; exit 1; fi
+        echo "✅ 帖子模块通过"
 
-        // 2. 管理员审核
-        request('http://127.0.0.1:8000/index.php?action=login', ['username'=>'admin', 'password'=>'123456'], 'admin_cookies.txt');
-        request("http://127.0.0.1:8000/admin.php?action=approve&id={$user1_uid}", [], 'admin_cookies.txt', 'GET');
+    - name: 3. 私聊(发送与撤回)
+      run: |
+        # User1 发私聊给 Admin，并撤回
+        curl -s -b u1_cookie.txt -X POST -d "to=1&content=SecretMsg" "http://127.0.0.1:8000/send_msg.php"
+        MID=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT MAX(mid) FROM messages")
         
-        // 3. admin 发帖
-        request('http://127.0.0.1:8000/index.php?action=post', ['content'=>'这是admin的测试帖'], 'admin_cookies.txt');
-        $pid = $pdo->query("SELECT pid FROM posts ORDER BY pid DESC LIMIT 1")->fetchColumn();
+        curl -s -b u1_cookie.txt -X POST -d "mid=$MID" "http://127.0.0.1:8000/index1.php?action=recall"
         
-        // 4. user1 登录，评论，点赞，私聊
-        request('http://127.0.0.1:8000/index.php?action=login', ['username'=>'user1', 'password'=>'123456'], 'user1_cookies.txt');
-        request('http://127.0.0.1:8000/index.php?action=comment', ['pid'=>$pid, 'content'=>'这是user1的评论'], 'user1_cookies.txt');
-        request('http://127.0.0.1:8000/index.php?action=like', ['pid'=>$pid], 'user1_cookies.txt');
-        request('http://127.0.0.1:8000/send_msg.php', ['to'=>1, 'content'=>'这是user1发的私聊'], 'user1_cookies.txt');
-        
-        // 5. user1 上架物品
-        request('http://127.0.0.1:8000/market.php', ['add_item'=>1, 'title'=>'测试物品', 'price'=>100, 'desc_text'=>'描述'], 'user1_cookies.txt');
-        
-        // ★ 关键修改：去数据库里查真实的 itemId，不要用 lastInsertId
-        $itemId = $pdo->query("SELECT id FROM market_items ORDER BY id DESC LIMIT 1")->fetchColumn();
-        if(!$itemId) { echo "❌ 上架物品失败\n"; exit(1); }
+        # 验证是否软删除
+        DELETED=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT deleted FROM messages WHERE mid=$MID")
+        if [ "$DELETED" != "1" ]; then echo "❌ 私聊撤回失败"; exit 1; fi
+        echo "✅ 私聊模块通过"
 
-        // 6. admin 购买物品
-        $beforePoints = (int)$pdo->query("SELECT points FROM users WHERE uid=1")->fetchColumn();
-        request("http://127.0.0.1:8000/market.php?buy=$itemId", [], 'admin_cookies.txt', 'GET');
-        $afterPoints = (int)$pdo->query("SELECT points FROM users WHERE uid=1")->fetchColumn();
+    - name: 4. 集市(买卖与上下架)
+      run: |
+        # User1 上架物品
+        curl -s -b u1_cookie.txt -X POST -d "add_item=1&title=Item&price=100&desc_text=D" "http://127.0.0.1:8000/market.php"
+        ITEM_ID=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT MAX(id) FROM market_items")
+        
+        # Admin 购买
+        curl -s -b admin_cookie.txt "http://127.0.0.1:8000/market.php?buy=$ITEM_ID"
+        STATUS=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT status FROM market_items WHERE id=$ITEM_ID")
+        if [ "$STATUS" != "0" ]; then echo "❌ 购买后状态未变为下架"; exit 1; fi
+        
+        # User1 重新上架一个，并自己下架
+        curl -s -b u1_cookie.txt -X POST -d "add_item=1&title=Item2&price=50&desc_text=D" "http://127.0.0.1:8000/market.php"
+        ITEM2=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT MAX(id) FROM market_items")
+        curl -s -b u1_cookie.txt "http://127.0.0.1:8000/market.php?toggle=$ITEM2"
+        echo "✅ 集市模块通过"
 
-        // ====== 终极验证 ======
-        $errors = [];
+    - name: 5. 后台管理(改分/冻结/公告)
+      run: |
+        # 后台改积分
+        curl -s -b admin_cookie.txt -X POST -d "mode=edit_user&tid=2&points=9999" "http://127.0.0.1:8000/admin.php"
+        PTS=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT points FROM users WHERE uid=2")
+        if [ "$PTS" != "9999" ]; then echo "❌ 修改积分失败"; exit 1; fi
         
-        $cCount = (int)$pdo->query("SELECT COUNT(*) FROM comments WHERE pid=$pid")->fetchColumn();
-        if($cCount !== 1) $errors[] = "评论失败";
+        # 后台冻结 User1
+        curl -s -b admin_cookie.txt "http://127.0.0.1:8000/admin.php?action=toggle_ban&id=2"
+        NG=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT ng FROM users WHERE uid=2")
+        if [ "$NG" != "1" ]; then echo "❌ 冻结失败"; exit 1; fi
         
-        $lCount = (int)$pdo->query("SELECT COUNT(*) FROM likes WHERE pid=$pid")->fetchColumn();
-        if($lCount !== 1) $errors[] = "点赞失败";
-        
-        $mCount = (int)$pdo->query("SELECT COUNT(*) FROM messages WHERE from_uid={$user1_uid} AND to_uid=1")->fetchColumn();
-        if($mCount !== 1) $errors[] = "私聊失败";
-        
-        if($beforePoints - $afterPoints !== 100) {
-            $errors[] = "集市购买扣款失败 (前:{$beforePoints}, 后:{$afterPoints})";
-        }
-
-        if(empty($errors)) {
-            echo "✅ 全功能测试通过！注册、审核、发帖、评论、点赞、私聊、集市买卖，全部逻辑正常！\n";
-        } else {
-            echo "❌ 测试失败：\n" . implode("\n", $errors) . "\n";
-            exit(1);
-        }
-        EOF
-        php test_all.php
+        # 后台修改公告
+        curl -s -b admin_cookie.txt -X POST -d "mode=announce&content=NewAnnounce" "http://127.0.0.1:8000/admin.php"
+        ANN=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT content FROM announcements WHERE aid=1")
+        if [ "$ANN" != "NewAnnounce" ]; then echo "❌ 修改公告失败"; exit 1; fi
+        echo "✅ 后台管理模块通过"

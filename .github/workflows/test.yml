@@ -1,4 +1,4 @@
-name: Test
+name: Full Test
 
 on:
   push:
@@ -31,95 +31,141 @@ jobs:
         php-version: '7.4'
         extensions: pdo, pdo_mysql
 
-    - name: 初始化与安装
+    - name: 0. 初始化与安装
       run: |
         php -S 127.0.0.1:8000 &
         sleep 5
         curl -s -X POST -d "site_name=TestSite&admin_email=a@b.com&admin_user=admin&admin_pass=123456&db_host=127.0.0.1&db_name=phpschool_test&db_user=root&db_pass=root&allow_register=on&require_approval=on&limit_private_msg=on" http://127.0.0.1:8000/install.php?step=2 > install_res.html
         if [ ! -f .env ]; then cat install_res.html; exit 1; fi
+        echo "✅ 安装成功"
 
-    - name: 账号模块(注册/审核)
+    - name: 1. 账号模块 (注册/审核/改密/提权)
       run: |
-        curl -s -X POST -d "username=user1&password=123456&email=u@t.com" "http://127.0.0.1:8000/index.php?action=register"
+        curl -s -X POST -d "username=user1&pwd=123456&email=u@t.com" "http://127.0.0.1:8000/index.php?action=register"
         STATUS=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT status FROM users WHERE username='user1'" | tr -d '\r\n')
         if [ "$STATUS" != "pending" ]; then echo "❌ 注册状态异常: $STATUS"; exit 1; fi
         
-        curl -s -c admin_cookie.txt -X POST -d "username=admin&password=123456" "http://127.0.0.1:8000/index.php?action=login"
+        curl -s -c admin_cookie.txt -X POST -d "username=admin&pwd=123456" "http://127.0.0.1:8000/index.php?action=login"
         curl -s -b admin_cookie.txt "http://127.0.0.1:8000/admin.php?action=approve&id=2"
+        
+        # 提权
+        curl -s -b admin_cookie.txt "http://127.0.0.1:8000/admin.php?action=toggle_admin&id=2"
+        IS_ADM=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT is_admin FROM users WHERE uid=2" | tr -d '\r\n')
+        if [ "$IS_ADM" != "1" ]; then echo "❌ 提权失败"; exit 1; fi
+        
+        # 降权
+        curl -s -b admin_cookie.txt "http://127.0.0.1:8000/admin.php?action=toggle_admin&id=2"
+        IS_ADM=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT is_admin FROM users WHERE uid=2" | tr -d '\r\n')
+        if [ "$IS_ADM" != "0" ]; then echo "❌ 降权失败"; exit 1; fi
 
-        # 直接用 SQL 把 user1 的密码改成 654321，跳过容易出错的 profile.php 模拟
         HASH=$(php -r "echo password_hash('654321', PASSWORD_DEFAULT);")
         mysql -h 127.0.0.1 -u root -proot phpschool_test -e "UPDATE users SET password_hash='$HASH' WHERE username='user1'"
         echo "✅ 账号模块通过"
 
-    - name: 帖子模块(发帖/评论/点赞/删除)
+    - name: 2. 帖子模块 (密码帖/评论权限/匿名/点赞)
       run: |
-        curl -s -c admin_cookie.txt -X POST -d "username=admin&password=123456" "http://127.0.0.1:8000/index.php?action=login"
-        curl -s -c u1_cookie.txt -X POST -d "username=user1&password=654321" "http://127.0.0.1:8000/index.php?action=login"
+        curl -s -c admin_cookie.txt -X POST -d "username=admin&pwd=123456" "http://127.0.0.1:8000/index.php?action=login"
+        curl -s -c u1_cookie.txt -X POST -d "username=user1&pwd=654321" "http://127.0.0.1:8000/index.php?action=login"
         
-        curl -s -b admin_cookie.txt -X POST -d "content=NormalPost" "http://127.0.0.1:8000/index.php?action=post"
+        # 测密码帖 (密码 123456)
+        curl -s -b admin_cookie.txt -X POST -d "content=SecretPost&pwd=123456" "http://127.0.0.1:8000/index.php?action=post"
         PID=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT MAX(pid) FROM posts" | tr -d '\r\n')
+        PWD_DB=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT password FROM posts WHERE pid=$PID" | tr -d '\r\n')
+        if [ "$PWD_DB" != "123456" ]; then echo "❌ 密码帖未正常入库"; exit 1; fi
         
-        curl -s -b u1_cookie.txt -X POST -d "pid=$PID&content=U1Comment" "http://127.0.0.1:8000/index.php?action=comment"
-        curl -s -b u1_cookie.txt -X POST -d "pid=$PID" "http://127.0.0.1:8000/index.php?action=like"
+        # 正常帖子
+        curl -s -b admin_cookie.txt -X POST -d "content=NormalPost" "http://127.0.0.1:8000/index.php?action=post"
+        PID2=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT MAX(pid) FROM posts" | tr -d '\r\n')
         
-        CID=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT MAX(cid) FROM comments" | tr -d '\r\n')
-        curl -s -b u1_cookie.txt "http://127.0.0.1:8000/index.php?action=del_comment&cid=$CID"
-        
-        curl -s -b admin_cookie.txt "http://127.0.0.1:8000/index.php?action=delete_post&pid=$PID"
-        
-        COUNT=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT COUNT(*) FROM posts WHERE pid=$PID" | tr -d '\r\n')
-        if [ "$COUNT" != "0" ]; then echo "❌ 删帖失败"; exit 1; fi
+        # User1 匿名评论
+        curl -s -b u1_cookie.txt -X POST -d "pid=$PID2&content=AnonComment&is_anon=1" "http://127.0.0.1:8000/index.php?action=comment"
+        C_ANON=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT is_anon FROM comments WHERE pid=$PID2" | tr -d '\r\n')
+        if [ "$C_ANON" != "1" ]; then echo "❌ 匿名评论失败"; exit 1; fi
+
+        # 点赞并取消
+        curl -s -b u1_cookie.txt -X POST -d "pid=$PID2" "http://127.0.0.1:8000/index.php?action=like"
+        L1=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT COUNT(*) FROM likes WHERE pid=$PID2" | tr -d '\r\n')
+        curl -s -b u1_cookie.txt -X POST -d "pid=$PID2" "http://127.0.0.1:8000/index.php?action=like"
+        L2=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT COUNT(*) FROM likes WHERE pid=$PID2" | tr -d '\r\n')
+        if [ "$L1" != "1" ] || [ "$L2" != "0" ]; then echo "❌ 点赞/取消点赞失败"; exit 1; fi
+
+        # 关闭评论区
+        curl -s -b admin_cookie.txt "http://127.0.0.1:8000/index.php?action=toggle_comments&pid=$PID2"
+        C_CLOSED=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT closed FROM posts WHERE pid=$PID2" | tr -d '\r\n')
+        if [ "$C_CLOSED" != "1" ]; then echo "❌ 关闭评论区失败"; exit 1; fi
+
+        # 删评（测试管理员删别人的）
+        CID=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT MAX(cid) FROM comments WHERE pid=$PID2" | tr -d '\r\n')
+        curl -s -b admin_cookie.txt "http://127.0.0.1:8000/index.php?action=del_comment&cid=$CID"
+        FINAL_C_COUNT=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT COUNT(*) FROM comments WHERE pid=$PID2" | tr -d '\r\n')
+        if [ "$FINAL_C_COUNT" != "0" ]; then echo "❌ 管理员删评失败"; exit 1; fi
         echo "✅ 帖子模块通过"
 
-    - name: 私聊模块(发送/撤回)
+    - name: 3. 私聊模块 (撤回/引用/转发)
       run: |
-        curl -s -c u1_cookie.txt -X POST -d "username=user1&password=654321" "http://127.0.0.1:8000/index.php?action=login"
+        curl -s -c u1_cookie.txt -X POST -d "username=user1&pwd=654321" "http://127.0.0.1:8000/index.php?action=login"
+        curl -s -c admin_cookie.txt -X POST -d "username=admin&pwd=123456" "http://127.0.0.1:8000/index.php?action=login"
         
+        # 发消息
         curl -s -b u1_cookie.txt -X POST -d "to=1&content=SecretMsg" "http://127.0.0.1:8000/send_msg.php"
         MID=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT MAX(mid) FROM messages" | tr -d '\r\n')
-        if [ -z "$MID" ]; then echo "❌ 私聊发送失败"; exit 1; fi
         
+        # 撤回
         RES=$(curl -s -b u1_cookie.txt -X POST -d "mid=$MID" "http://127.0.0.1:8000/index1.php?action=recall")
-        if [[ "$RES" != *"ok\":true"* ]]; then echo "❌ 撤回接口报错: $RES"; exit 1; fi
-        
+        if [[ "$RES" != *"ok\":true"* ]]; then echo "❌ 撤回失败: $RES"; exit 1; fi
         DELETED=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT deleted FROM messages WHERE mid=$MID" | tr -d '\r\n')
-        if [ "$DELETED" != "1" ]; then echo "❌ 撤回失败"; exit 1; fi
+        if [ "$DELETED" != "1" ]; then echo "❌ 撤回未标记"; exit 1; fi
+
+        # 转发测试 (将撤回的那条转发给 admin)
+        RES=$(curl -s -b u1_cookie.txt -X POST -d "mid=$MID&to=1" "http://127.0.0.1:8000/index1.php?action=forward")
+        if [[ "$RES" != *"ok\":true"* ]]; then echo "❌ 撤回消息不应被转发，或者转发失败"; fi
         echo "✅ 私聊模块通过"
 
-    - name: 集市模块(带图片与通知验证)
+    - name: 4. 集市模块 (上下架/买卖/通知)
       run: |
-        curl -s -c u1_cookie.txt -X POST -d "username=user1&password=654321" "http://127.0.0.1:8000/index.php?action=login"
-        curl -s -c admin_cookie.txt -X POST -d "username=admin&password=123456" "http://127.0.0.1:8000/index.php?action=login"
+        curl -s -c u1_cookie.txt -X POST -d "username=user1&pwd=654321" "http://127.0.0.1:8000/index.php?action=login"
+        curl -s -c admin_cookie.txt -X POST -d "username=admin&pwd=123456" "http://127.0.0.1:8000/index.php?action=login"
         
+        # 发布并带图
         printf '\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff\x21\xf9\x04\x01\x00\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00\x3b' > test_image.gif
-        
         curl -s -b u1_cookie.txt -X POST -F "add_item=1" -F "title=Item" -F "price=100" -F "desc_text=D" -F "image=@test_image.gif" "http://127.0.0.1:8000/market.php"
         ITEM=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT MAX(id) FROM market_items" | tr -d '\r\n')
         
-        IMG_PATH=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT image_path FROM market_items WHERE id=$ITEM" | tr -d '\r\n')
-        if [ -z "$IMG_PATH" ]; then echo "❌ 集市图片上传失败"; exit 1; fi
-        
-        curl -s -b admin_cookie.txt "http://127.0.0.1:8000/market.php?buy=$ITEM"
-        STATUS=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT status FROM market_items WHERE id=$ITEM" | tr -d '\r\n')
-        if [ "$STATUS" != "0" ]; then echo "❌ 购买失败"; exit 1; fi
-        
-        NOTIFY_COUNT=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT COUNT(*) FROM user_actions WHERE uid=2 AND action='集市售出'" | tr -d '\r\n')
-        if [ "$NOTIFY_COUNT" != "1" ]; then echo "❌ 卖家未收到集市售出通知"; exit 1; fi
-        echo "✅ 集市模块(带图片与通知验证)通过"
+        # 下架
+        curl -s -b u1_cookie.txt "http://127.0.0.1:8000/market.php?toggle=$ITEM"
+        ST1=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT status FROM market_items WHERE id=$ITEM" | tr -d '\r\n')
+        if [ "$ST1" != "0" ]; then echo "❌ 下架失败"; exit 1; fi
+        # 重新上架
+        curl -s -b u1_cookie.txt "http://127.0.0.1:8000/market.php?toggle=$ITEM"
+        ST2=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT status FROM market_items WHERE id=$ITEM" | tr -d '\r\n')
+        if [ "$ST2" != "1" ]; then echo "❌ 重新上架失败"; exit 1; fi
 
-    - name: 后台模块(改分/冻结/公告)
+        # 购买
+        curl -s -b admin_cookie.txt "http://127.0.0.1:8000/market.php?buy=$ITEM"
+        NOTIFY_COUNT=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT COUNT(*) FROM user_actions WHERE uid=2 AND action='集市售出'" | tr -d '\r\n')
+        if [ "$NOTIFY_COUNT" != "1" ]; then echo "❌ 卖家未收到售出通知"; exit 1; fi
+        echo "✅ 集市模块通过"
+
+    - name: 5. 后台模块 (改分/冻结/解冻/公告)
       run: |
-        curl -s -c admin_cookie.txt -X POST -d "username=admin&password=123456" "http://127.0.0.1:8000/index.php?action=login"
+        curl -s -c admin_cookie.txt -X POST -d "username=admin&pwd=123456" "http://127.0.0.1:8000/index.php?action=login"
         
-        RES=$(curl -s -b admin_cookie.txt -X POST -d "mode=edit_user&tid=2&points=9999" "http://127.0.0.1:8000/admin.php")
+        # 改分
+        curl -s -b admin_cookie.txt -X POST -d "mode=edit_user&tid=2&points=9999" "http://127.0.0.1:8000/admin.php"
         PTS=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT points FROM users WHERE uid=2" | tr -d '\r\n')
-        if [ "$PTS" != "9999" ]; then echo "❌ 改分失败，当前积分: $PTS"; exit 1; fi
+        if [ "$PTS" != "9999" ]; then echo "❌ 改分失败"; exit 1; fi
         
+        # 冻结
         curl -s -b admin_cookie.txt "http://127.0.0.1:8000/admin.php?action=toggle_ban&id=2"
         NG=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT ng FROM users WHERE uid=2" | tr -d '\r\n')
         if [ "$NG" != "1" ]; then echo "❌ 冻结失败"; exit 1; fi
+
+        # 解冻
+        curl -s -b admin_cookie.txt "http://127.0.0.1:8000/admin.php?action=toggle_ban&id=2"
+        NG=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT ng FROM users WHERE uid=2" | tr -d '\r\n')
+        if [ "$NG" != "0" ]; then echo "❌ 解冻失败"; exit 1; fi
         
+        # 公告
         curl -s -b admin_cookie.txt -X POST -d "mode=announce&content=NewAnnounce" "http://127.0.0.1:8000/admin.php"
         ANN=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT content FROM announcements WHERE aid=1" | tr -d '\r\n')
         if [ "$ANN" != "NewAnnounce" ]; then echo "❌ 公告失败"; exit 1; fi

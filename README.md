@@ -12,7 +12,7 @@
 
 **无需 Composer，无需复杂环境，只要有 PHP 和 MySQL，扔上去就能跑。**
 
-[⬇️ 一键下载最新版](https://github.com/BA4QZP/CampusWall/releases/latest) · [🌐 在线演示](https://ba4qzp.github.io/CampusWall/) · [🐛 提交 Issue](https://github.com/BA4QZP/CampusWall/issues)
+[⬇️ 一键下载最新版](https://github.com/BA4QZP/CampusWall/releases/latest) · [🧪 浏览所有版本（含测试版）](https://github.com/BA4QZP/CampusWall/releases) · [🌐 在线演示](https://ba4qzp.github.io/CampusWall/) · [🐛 提交 Issue](https://github.com/BA4QZP/CampusWall/issues)
 
 ---
 

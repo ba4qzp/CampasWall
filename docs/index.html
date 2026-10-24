@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusWall - 极简校园墙</title>
+    <style>
+        :root {
+            --bg: #0f172a; --text: #f8fafc; --text-muted: #94a3b8;
+            --primary: #3b82f6; --primary-hover: #2563eb;
+            --card: #1e293b; --border: #334155; --warn: #eab308;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg); color: var(--text); line-height: 1.6;
+            display: flex; flex-direction: column; min-height: 100vh; text-align: center;
+        }
+        .top-warn {
+            background-color: rgba(234, 179, 8, 0.15); color: var(--warn);
+            padding: 10px 20px; font-size: 14px; border-bottom: 1px solid rgba(234, 179, 8, 0.3);
+            font-weight: 500;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 60px 20px; flex: 1; }
+        .badge {
+            display: inline-block; padding: 4px 12px; background-color: rgba(59, 130, 246, 0.1);
+            color: var(--primary); border-radius: 20px; font-size: 14px; font-weight: 600; margin-bottom: 20px;
+        }
+        h1 { font-size: 3rem; font-weight: 800; margin-bottom: 20px; letter-spacing: -0.02em; }
+        h1 span { background: linear-gradient(90deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        p.subtitle { font-size: 1.2rem; color: var(--text-muted); margin-bottom: 40px; max-width: 600px; margin-left: auto; margin-right: auto; }
+        .btns { display: flex; gap: 16px; justify-content: center; margin-bottom: 60px; flex-wrap: wrap; }
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 12px 28px; font-size: 16px; font-weight: 600; border-radius: 8px;
+            text-decoration: none; transition: all 0.2s;
+        }
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover { background-color: var(--primary-hover); transform: translateY(-2px); }
+        .btn-secondary { background-color: transparent; color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { background-color: var(--card); border-color: var(--text-muted); }
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; text-align: left; }
+        .feature-card {
+            background-color: var(--card); padding: 24px; border-radius: 12px;
+            border: 1px solid var(--border); transition: border-color 0.2s;
+        }
+        .feature-card:hover { border-color: var(--primary); }
+        .feature-card h3 { font-size: 1.1rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+        .feature-card p { font-size: 0.95rem; color: var(--text-muted); }
+        footer {
+            padding: 30px; color: var(--text-muted); font-size: 14px;
+            border-top: 1px solid var(--border);
+        }
+        footer a { color: var(--primary); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <div class="top-warn">
+        ⚠️ 重要声明：本项目大量代码由 DEEPSEEK AI 辅助生成。这是一个开源探索项目，部署前请充分测试。
+    </div>
+
+    <div class="container">
+        <div class="badge">v1.0.0 全新开源发布</div>
+        <h1>Campus<span>Wall</span></h1>
+        <p class="subtitle">专为校园场景打造的轻量级树洞、匿名论坛与积分集市。无需繁琐配置，一包代码，即刻上线。</p>
+        
+        <div class="btns">
+            <a href="https://github.com/BA4QZP/CampusWall" class="btn btn-primary">前往 GitHub 仓库</a>
+            <a href="https://github.com/BA4QZP/CampusWall/releases/latest" class="btn btn-secondary">⬇️ 下载最新源码</a>
+        </div>
+
+        <div class="features">
+            <div class="feature-card">
+                <h3>🚀 极速部署</h3>
+                <p>无需 Composer，无视复杂依赖。纯 PHP 环境，自带一键安装向导，一分钟跑起来。</p>
+            </div>
+            <div class="feature-card">
+                <h3>🛡️ 纯粹校园</h3>
+                <p>抛弃传统论坛的繁文缛节。极简权限控制，一键开关注册，支持强制人工审核。</p>
+            </div>
+            <div class="feature-card">
+                <h3>🛒 积分集市</h3>
+                <p>独创的站内交易系统。内置积分体系，用户可发布悬赏或闲置，系统自动完成扣款与结算。</p>
+            </div>
+            <div class="feature-card">
+                <h3>🤖 AI 助手</h3>
+                <p>无缝接入大语言模型。支持站内内容检索与上下文聊天，兼容任意 OpenAI 格式接口。</p>
+            </div>
+            <div class="feature-card">
+                <h3>🎭 绝对隐私</h3>
+                <p>完善的匿名发帖与私聊机制。支持 Markdown 语法，保护学生群体的真实表达。</p>
+            </div>
+            <div class="feature-card">
+                <h3>💸 免费白嫖</h3>
+                <p>极致轻量，适配 InfinityFree 等免费虚拟主机。无需昂贵的服务器，0 成本建站。</p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        © 2026 CampusWall · 基于 <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a> 开源 · 由 DEEPSEEK 协助开发
+    </footer>
+
+</body>
+</html>

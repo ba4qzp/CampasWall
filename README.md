@@ -1,18 +1,18 @@
 > ⚠️ **重要声明：本项目大量代码由 DEEPSEEK AI 辅助生成。**
 > 这是一个旨在学习和探索的开源项目，请在部署和使用前充分测试，并根据自身需求进行调整。
 
-# 🏫 CampusWall · 极简校园墙
+# 🏫 PHPSchool · 极简校园墙
 
 **一个专为校园场景打造的轻量级、无需复杂配置的 PHP 校园墙/树洞系统。**
 
-[![Latest Release](https://img.shields.io/github/v/release/BA4QZP/CampusWall?style=flat-square&color=blue)](https://github.com/BA4QZP/CampusWall/releases)
+[![Latest Release](https://img.shields.io/github/v/release/BA4QZP/PHPSchool?style=flat-square&color=blue)](https://github.com/BA4QZP/PHPSchool/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![PHP Version](https://img.shields.io/badge/PHP-%3E%3D7.4-8892bf.svg)](https://php.net)
 [![AI Assisted](https://img.shields.io/badge/AI%20Assisted-DEEPSEEK-yellow.svg)](#)
 
 **无需 Composer，无需复杂环境，只要有 PHP 和 MySQL，扔上去就能跑。**
 
-[⬇️ 一键下载最新版](https://github.com/BA4QZP/CampusWall/releases/latest) · [🧪 浏览所有版本（含测试版）](https://github.com/BA4QZP/CampusWall/releases) · [🌐 在线演示](https://ba4qzp.github.io/CampusWall/) · [🐛 提交 Issue](https://github.com/BA4QZP/CampusWall/issues)
+[⬇️ 一键下载最新版](https://github.com/BA4QZP/PHPSchool/releases/latest) · [🧪 浏览所有版本（含测试版）](https://github.com/BA4QZP/PHPSchool/releases) · [🌐 在线演示](https://ba4qzp.github.io/PHPSchool/) · [🐛 提交 Issue](https://github.com/BA4QZP/PHPSchool/issues)
 
 ---
 
@@ -49,7 +49,7 @@
 
 ## 🚀 极速部署（以 InfinityFree 为例）
 
-1. **下载源码**：去 [Releases](https://github.com/BA4QZP/CampusWall/releases/latest) 页面下载最新的 `.zip` 压缩包并解压。
+1. **下载源码**：去 [Releases](https://github.com/BA4QZP/PHPSchool/releases/latest) 页面下载最新的 `.zip` 压缩包并解压。
 2. **上传代码**：将所有文件上传到你的服务器（或 `htdocs` 目录）。
 3. **创建数据库**：在你的主机控制面板创建一个 MySQL 数据库（记下账号、密码、库名）。
 4. **运行安装**：浏览器访问 `你的域名/install.php`，填入数据库信息，勾选需要的功能开关，点击安装。
@@ -76,10 +76,9 @@ AI_MODEL="agnes-3.0-flash"
 
 ## ⚠️ 安全与运维建议
 
-1. 确保 `uploads/` 目录不可执行 PHP 文件（如果你使用 Nginx/Apache，可以配置禁止解析）。
-2. 务必在 `.gitignore` 中忽略 `.env` 文件，防止数据库密码泄露。
-3. 建议在安装时开启强制人工审核，防止外部闲杂人员进入。
-4. 建议定期清理 `ip_logs` 表，避免数据库体积膨胀。
+1. 确保 `uploads/` 目录不可执行 PHP 文件（如果你使用 Nginx/Apache，可以配置禁止解析。）
+2. 建议在安装时开启强制人工审核，防止外部闲杂人员进入。
+3. 建议定期清理 `ip_logs` 表，避免数据库体积膨胀。
 
 ---
 

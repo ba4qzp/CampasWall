@@ -1,0 +1,106 @@
+<?php
+if(!defined('SITE_NAME')){ die('非法访问'); }
+$search = trim($_GET['q'] ?? '');
+$where = ['p.hidden = 0']; $params = [];
+if($search){ $where[] = '(p.content LIKE ? OR p.tags LIKE ?)'; $params[] = "%$search%"; $params[] = "%$search%"; }
+
+$sql = 'SELECT p.*, u.username, u.nickname, u.avatar FROM posts p JOIN users u ON p.uid = u.uid WHERE '.implode(' AND ', $where).' ORDER BY p.pid DESC LIMIT 200';
+$stmt = $pdo->prepare($sql); $stmt->execute($params); $posts = $stmt->fetchAll();
+
+$pids = array_column($posts, 'pid'); $myLikes = []; $likeCounts = [];
+if($pids){
+    $place = implode(',', array_fill(0, count($pids), '?'));
+    $s2 = $pdo->prepare("SELECT pid, COUNT(*) c FROM likes WHERE pid IN ($place) GROUP BY pid"); $s2->execute($pids);
+    while($r = $s2->fetch()) $likeCounts[$r['pid']] = $r['c'];
+    $s3 = $pdo->prepare("SELECT pid FROM likes WHERE uid = ? AND pid IN ($place)"); $s3->execute(array_merge([$uid], $pids));
+    while($r = $s3->fetch()) $myLikes[$r['pid']] = true;
+}
+page_head('首页'); ?>
+
+<div class="card" style="text-align:center">
+    <a class="fl" href="javascript:void(0)" onclick="document.getElementById('postForm').style.display='block'">✏️ 发帖</a>
+</div>
+
+<div class="card" id="postForm" style="display:none">
+    <form method="post" action="?action=post" id="pForm" enctype="multipart/form-data">
+        <textarea name="content" placeholder="说点什么..."></textarea>
+        <div class="hint">Markdown：`**粗体**` · `*斜体*` · `` `代码` `` · `- 列表`</div>
+        <input type="text" name="tags" placeholder="标签（逗号分隔）">
+        <input type="file" id="fileInput" multiple>
+        <div class="progress" id="progWrap" style="display:none"><div id="progBar" style="width:0"></div></div>
+        <input type="hidden" name="files_json" id="filesJson">
+        <label><input type="checkbox" name="is_anon" value="1"> 匿名</label>
+        <input type="text" name="pwd" placeholder="6位数字密码(可选)" pattern="\d{6}">
+        <button type="submit" id="subBtn">发布</button>
+    </form>
+</div>
+
+<div class="card">
+    <form method="get"><input type="text" name="q" placeholder="搜索帖子或标签..." value="<?=h($search)?>"><button type="submit">搜索</button></form>
+</div>
+
+<?php foreach($posts as $p):
+    $is_owner = ((int)$p['uid'] === $uid); $files = json_decode($p['files'] ?: '[]', true);
+    $locked = ($p['password'] && !$is_admin && !$is_owner && empty($_SESSION['unlocked_posts'][$p['pid']]));
+    ?>
+    <div class="post" id="p<?=$p['pid']?>">
+        <div class="meta">
+            <?php if($p['is_anon']): ?><span class="anon-tag">匿名</span>
+            <?php else: ?><img src="<?=h($p['avatar'] ?: 'assets/default.png')?>"><a href="profile.php?uid=<?=$p['uid']?>"><?=h(show_name($p))?></a><?php endif; ?>
+            · <?=h($p['created_at'])?>
+            <?php if($is_admin || $is_owner): ?><a href="?action=delete_post&pid=<?=$p['pid']?>" onclick="return confirm('删帖？')" style="color:red;float:right">删除</a><?php endif; ?>
+        </div>
+        <?php if($locked): ?>
+            <form method="post" action="?action=unlock_post&pid=<?=$p['pid']?>">
+                <p>密码帖：<input type="text" name="pwd" style="width:120px"> <button type="submit">解锁</button></p>
+            </form>
+        <?php else: ?>
+            <div class="md"><?=h($p['content'])?></div>
+            <?php foreach($files as $f){ if($f['img']) echo '<img class="post-img" src="'.h($f['path']).'">'; else echo '<a href="'.h($f['path']).'">📎 '.h($f['orig']).'</a>'; } ?>
+            <div style="margin-top:10px">
+                <form method="post" action="?action=like" style="display:inline">
+                    <input type="hidden" name="pid" value="<?=$p['pid']?>">
+                    <button type="submit" class="fl <?=isset($myLikes[$p['pid']])?'red':'gray'?>">❤ <?=$likeCounts[$p['pid']]??0?></button>
+                </form>
+            </div>
+            <div style="margin-top:10px;border-top:1px solid #eee;padding-top:8px">
+                <?php
+                $cstmt = $pdo->prepare('SELECT c.*, u.username, u.nickname FROM comments c JOIN users u ON c.uid = u.uid WHERE c.pid = ? AND c.hidden = 0 ORDER BY c.cid ASC');
+                $cstmt->execute([$p['pid']]);
+                while($c = $cstmt->fetch()){ echo '<div class="meta">'.($c['is_anon']?'匿名':h(show_name($c))).':</div><div class="md">'.h($c['content']).'</div>'; }
+                ?>
+                <form method="post" action="?action=comment" style="margin-top:6px">
+                    <input type="hidden" name="pid" value="<?=$p['pid']?>">
+                    <input type="text" name="content" placeholder="评论..." required>
+                    <button type="submit">发送</button>
+                </form>
+            </div>
+        <?php endif; ?>
+    </div>
+<?php endforeach; ?>
+
+<script>
+const CHUNK_SIZE = 4 * 1024 * 1024, form = document.getElementById('pForm');
+if(form){
+    form.addEventListener('submit', async (e)=>{
+        const files = document.getElementById('fileInput').files;
+        if(!files.length) return;
+        e.preventDefault(); document.getElementById('subBtn').disabled = true;
+        document.getElementById('progWrap').style.display = 'block';
+        let res = [];
+        for(let file of files){
+            let id = [...crypto.getRandomValues(new Uint8Array(16))].map(b=>b.toString(16).padStart(2,'0')).join('');
+            let total = Math.ceil(file.size / CHUNK_SIZE);
+            for(let i=0;i<total;i++){
+                let fd = new FormData(); fd.append('fileId', id); fd.append('chunkIndex', i); fd.append('totalChunks', total); fd.append('filename', file.name); fd.append('chunk', file.slice(i*CHUNK_SIZE, (i+1)*CHUNK_SIZE));
+                let r = await fetch('upload.php', {method:'POST', body:fd}); let j = await r.json();
+                if(j.path) res.push(j);
+                document.getElementById('progBar').style.width = ((i+1)/total*100) + '%';
+            }
+        }
+        document.getElementById('filesJson').value = JSON.stringify(res);
+        HTMLFormElement.prototype.submit.call(form);
+    });
+}
+</script>
+<?php page_end(); ?>

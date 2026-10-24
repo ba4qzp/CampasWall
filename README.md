@@ -1,87 +1,46 @@
-> ⚠️ **重要声明：本项目大量代码由 DEEPSEEK AI 辅助生成。**
-> 这是一个旨在学习和探索的开源项目，请在部署和使用前充分测试，并根据自身需求进行调整。
+# PHPSchool
 
-# 🏫 PHPSchool · 极简校园墙
+![PHP](https://img.shields.io/badge/PHP-7.4%2B-blue)
+![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-orange)
+![License](https://img.shields.io/badge/License-MIT-green)
+![Dependencies](https://img.shields.io/badge/Dependencies-Zero-brightgreen)
 
-**一个专为校园场景打造的轻量级、无需复杂配置的 PHP 校园墙/树洞系统。**
+PHPSchool 是一个基于原生 PHP 开发的极简校园墙 / 树洞系统。**无需 Composer，零外部依赖**，专为 InfinityFree 等免费虚拟主机设计，上传即可完成一键建站。
 
-[![Latest Release](https://img.shields.io/github/v/release/BA4QZP/PHPSchool?style=flat-square&color=blue)](https://github.com/BA4QZP/PHPSchool/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![PHP Version](https://img.shields.io/badge/PHP-%3E%3D7.4-8892bf.svg)](https://php.net)
-[![AI Assisted](https://img.shields.io/badge/AI%20Assisted-DEEPSEEK-yellow.svg)](#)
+## 🌐 在线演示
 
-**无需 Composer，无需复杂环境，只要有 PHP 和 MySQL，扔上去就能跑。**
-
-[⬇️ 一键下载最新版](https://github.com/BA4QZP/PHPSchool/releases/latest) · [🧪 浏览所有版本（含测试版）](https://github.com/BA4QZP/PHPSchool/releases) · [🌐 在线演示](https://ba4qzp.github.io/PHPSchool/) · [🐛 提交 Issue](https://github.com/BA4QZP/PHPSchool/issues)
-
----
+[https://phpschool.gt.tc](https://phpschool.gt.tc)
 
 ## ✨ 核心特性
 
-- 🚀 **傻瓜式安装**：自带可视化安装向导，自动建表、写入配置，一键跑通。
-- 🎭 **纯粹匿名**：支持完全匿名发帖，保护学生隐私。
-- 🛡️ **极简权限**：只有超管（站长）、管理员和普通学生，拒绝繁琐的版主等级。
-- 🛒 **积分集市**：独创的积分交易系统，所有用户都能上架闲置/悬赏，系统自动扣款结算。
-- 🤖 **AI 助手**：支持接入大语言模型（兼容 OpenAI 格式）。
-- 💬 **实时私聊**：内置实时轮询机制，支持引用与撤回功能。
-- 📝 **Markdown 支持**：发帖、评论、AI 对话完美支持 Markdown 语法。
+- **🚀 极速部署**：纯 PHP 环境，无需配置复杂的运行环境，自带一键安装向导。
+- **🛡️ 内置基础安全防线**：
+  - 安装/初始化时自动为 `uploads/` 目录生成 `.htaccess`，**强制阻断任何脚本执行权限**，防止恶意文件上传攻击。
+  - 内置日志自动维护机制，定期清理过期的 IP 日志与无用通知，防止数据库膨胀。
+- **🎭 隐私与互动**：支持匿名发帖、Markdown 渲染、密码帖、关闭评论区、匿名评论及私聊撤回。
+- **🛒 积分集市**：轻量级的站内交易系统，支持带图发布、积分扣款、售出通知等完整闭环。
+- **🤖 AI 助手扩展**：预留 OpenAI 兼容接口，在 `.env` 中填入 API Key 即可开启站内 AI 对话。
 
----
+## 📦 快速部署
 
-## 📁 目录结构
+1. 在 [Releases](https://github.com/BA4QZP/PHPSchool/releases) 页面下载最新版本的 `.zip` 压缩包。
+2. 解压并将所有文件上传至你的网站根目录。
+3. 在浏览器中访问 `http://你的域名/install.php`，按提示填写数据库信息和超管账号。
+4. **安装完成后，请务必删除 `install.php` 文件**，并在后台绑定你的域名。
 
-```text
-├── src/            # 核心代码 (初始化、公共函数、页面布局)
-├── assets/         # 静态资源 (CSS, JS, Markdown库)
-├── uploads/        # 用户上传的文件 (图片/附件)
-├── install.php     # 一键安装向导 (安装后删除)
-├── index.php       # 首页/发帖/评论/点赞路由
-├── board.php       # 帖子列表渲染
-├── index1.php      # 私聊界面
-├── market.php      # 积分集市
-├── profile.php     # 个人主页
-├── ai.php          # AI 助手
-├── admin.php       # 管理后台
-└── .env            # 环境配置 (安装后自动生成，切勿上传)
-```
+### 🛡️ 生产环境安全建议
 
----
+虽然系统已做基础加固，但部署至公网前，建议额外完成以下操作：
+1. **强制 HTTPS**：在服务器或 CDN 层配置 SSL 证书，防止数据明文传输。
+2. **修改目录权限**：确保 `uploads/` 目录仅有读写权限，无执行权限（系统已自动尝试通过 `.htaccess` 限制）。
+3. **敏感配置隔离**：确保 `.env` 文件不会被直接访问下载。
 
-## 🚀 极速部署（以 InfinityFree 为例）
+## 💻 关于本项目
 
-1. **下载源码**：去 [Releases](https://github.com/BA4QZP/PHPSchool/releases/latest) 页面下载最新的 `.zip` 压缩包并解压。
-2. **上传代码**：将所有文件上传到你的服务器（或 `htdocs` 目录）。
-3. **创建数据库**：在你的主机控制面板创建一个 MySQL 数据库（记下账号、密码、库名）。
-4. **运行安装**：浏览器访问 `你的域名/install.php`，填入数据库信息，勾选需要的功能开关，点击安装。
-5. **删除安装文件**：安装成功后，**务必删除 `install.php`**。
-6. **成为超管**：访问首页，注册第一个账号，系统会自动将你设为 **超级管理员**。
+- **开发背景**：本项目核心逻辑由 DeepSeek AI 辅助生成，旨在提供一个极致轻量、无需框架即可运行的校园交流平台原型。
+- **适用场景**：非常适合 PHP 初学者阅读源码、学习 Web 开发，或用于班级、社团的内部非核心交流。如需用于大型高并发或处理极其敏感的数据，建议由专业团队进行二次代码审计。
+- **开源协议**：[MIT License](https://opensource.org/licenses/MIT)。你可以自由使用、修改和分发。
 
----
+## 🤝 反馈与贡献
 
-## 🤖 关于 AI 助手的配置
-
-本站默认**不包含**任何 AI API Key（防止被盗刷）。如果不配置，导航栏将不会显示 AI 入口。
-
-- **免费方案**：建议去 [Agnes AI](https://agnes-ai.com) 或 [智谱开放平台](https://open.bigmodel.cn) 注册，他们有免费的 Flash 模型。
-- **付费方案**：你可以接入任意 OpenAI 兼容格式的接口（如 DeepSeek、Kimi 等）。
-
-配置方法：打开根目录的 `.env` 文件，修改以下三行：
-
-```env
-AI_BASE_URL="https://api.agnes-ai.cn/v1"
-AI_API_KEY="你申请的key"
-AI_MODEL="agnes-3.0-flash"
-```
----
-
-## ⚠️ 安全与运维建议
-
-1. 确保 `uploads/` 目录不可执行 PHP 文件（如果你使用 Nginx/Apache，可以配置禁止解析。）
-2. 建议在安装时开启强制人工审核，防止外部闲杂人员进入。
-3. 建议定期清理 `ip_logs` 表，避免数据库体积膨胀。
-
----
-
-## 📄 开源协议
-
-本项目基于 [MIT License](https://opensource.org/licenses/MIT) 开源。你可以自由地修改、分发，甚至用于商业用途。
+如果你在部署或使用中遇到 Bug，欢迎提交 [Issue](https://github.com/BA4QZP/PHPSchool/issues)。如果是安全相关的漏洞，请直接联系作者。

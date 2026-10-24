@@ -56,7 +56,6 @@ if($step === '2'){
         ";
         $pdo->exec($sql);
         
-        // 动态写入 .env 配置
         $envContent = "SITE_NAME=\"{$site_name}\"\n";
         $envContent .= "SITE_URL=\"http://".$_SERVER['HTTP_HOST']."\"\n";
         $envContent .= "ADMIN_EMAIL=\"{$admin_email}\"\n";
@@ -73,15 +72,15 @@ if($step === '2'){
     } catch (Exception $e) { $msg = '<h3 style="color:red">失败：'.$e->getMessage().'</h3>'; }
 }
 ?>
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>安装</title>
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>安装 PHPSchool</title>
 <style>
 body{font-family:sans-serif;max-width:500px;margin:40px auto;padding:20px;}
 input[type=text],input[type=email],input[type=password]{width:100%;padding:8px;margin:5px 0 15px;box-sizing:border-box;}
 .switch-row{margin:10px 0;display:flex;align-items:center;gap:8px;font-size:14px;}
 button{padding:10px 20px;background:#2563eb;color:#fff;border:none;cursor:pointer;width:100%;font-size:16px;border-radius:4px;}
-</style></head><body><h2>安装 CampusWall</h2><?php echo $msg; ?>
+</style></head><body><h2>安装 PHPSchool</h2><?php echo $msg; ?>
 <?php if($step === '1'): ?><form method="get"><input type="hidden" name="step" value="2">
-<label>站点名称</label><input type="text" name="site_name" value="CampusWall" required>
+<label>站点名称</label><input type="text" name="site_name" value="PHPSchool" required>
 <label>管理员邮箱</label><input type="email" name="admin_email" value="admin@example.com" required>
 
 <hr style="border:0;border-top:1px solid #eee;margin:20px 0">

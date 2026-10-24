@@ -16,12 +16,7 @@
             background-color: var(--bg); color: var(--text); line-height: 1.6;
             display: flex; flex-direction: column; min-height: 100vh; text-align: center;
         }
-        .top-warn {
-            background-color: var(--warn-bg); color: var(--warn);
-            padding: 10px 20px; font-size: 14px; border-bottom: 1px solid rgba(234, 179, 8, 0.3);
-            font-weight: 500;
-        }
-        .container { max-width: 900px; margin: 0 auto; padding: 60px 20px; flex: 1; }
+        .container { max-width: 900px; margin: 0 auto; padding: 80px 20px; flex: 1; }
         
         .badge-group { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; }
         .badge {
@@ -30,8 +25,9 @@
         .badge-stable { background-color: rgba(59, 130, 246, 0.1); color: var(--primary); }
         .badge-pre { background-color: var(--warn-bg); color: var(--warn); border: 1px solid rgba(234, 179, 8, 0.3); }
         .badge-loading { background-color: var(--border); color: var(--text-muted); }
+        .badge-tech { background-color: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
 
-        h1 { font-size: 3rem; font-weight: 800; margin-bottom: 20px; letter-spacing: -0.02em; }
+        h1 { font-size: 3.5rem; font-weight: 800; margin-bottom: 20px; letter-spacing: -0.02em; }
         h1 span { background: linear-gradient(90deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         p.subtitle { font-size: 1.2rem; color: var(--text-muted); margin-bottom: 40px; max-width: 600px; margin-left: auto; margin-right: auto; }
         
@@ -56,9 +52,10 @@
         .feature-card:hover { border-color: var(--primary); }
         .feature-card h3 { font-size: 1.1rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
         .feature-card p { font-size: 0.95rem; color: var(--text-muted); }
+        
         footer {
-            padding: 30px; color: var(--text-muted); font-size: 14px;
-            border-top: 1px solid var(--border);
+            padding: 30px; color: var(--text-muted); font-size: 13px;
+            border-top: 1px solid var(--border); line-height: 1.8;
         }
         footer a { color: var(--primary); text-decoration: none; }
         footer a:hover { text-decoration: underline; }
@@ -66,17 +63,15 @@
 </head>
 <body>
 
-    <div class="top-warn">
-        ⚠️ 重要声明：本项目大量代码由 DEEPSEEK AI 辅助生成。这是一个开源探索项目，部署前请充分测试。
-    </div>
-
     <div class="container">
         <div class="badge-group" id="version-badges">
-            <div class="badge badge-loading">正在获取版本信息...</div>
+            <div class="badge badge-tech">纯 PHP 原生开发</div>
+            <div class="badge badge-tech">零 Composer 依赖</div>
+            <div class="badge badge-loading" id="version-text">正在获取版本信息...</div>
         </div>
         
         <h1>PHP<span>School</span></h1>
-        <p class="subtitle">专为校园场景打造的轻量级树洞、匿名论坛与积分集市。无需繁琐配置，一包代码，即刻上线。</p>
+        <p class="subtitle">专为校园场景打造的轻量级树洞、匿名论坛与积分集市。极简架构，符合现代 Web 标准，上传即用。</p>
         
         <div class="btns" id="download-buttons">
             <a href="https://phpschool.gt.tc" class="btn btn-demo" target="_blank">🌐 在线演示</a>
@@ -86,40 +81,42 @@
         <div class="features">
             <div class="feature-card">
                 <h3>🚀 极速部署</h3>
-                <p>无需 Composer，无视复杂依赖。纯 PHP 环境，自带一键安装向导，一分钟跑起来。</p>
+                <p>无需配置复杂环境。纯 PHP + MySQL 架构，自带一键安装向导，完美适配 InfinityFree 等免费主机。</p>
             </div>
             <div class="feature-card">
-                <h3>🛡️ 纯粹校园</h3>
-                <p>抛弃传统论坛的繁文缛节。极简权限控制，一键开关注册，支持强制人工审核。</p>
+                <h3>🛡️ 内置安全防御</h3>
+                <p>系统自动生成 .htaccess 隔绝上传目录执行权限，自带日志定期清理机制，保障基础运行安全。</p>
             </div>
             <div class="feature-card">
                 <h3>🛒 积分集市</h3>
-                <p>独创的站内交易系统。内置积分体系，用户可发布悬赏或闲置，系统自动完成扣款与结算。</p>
+                <p>独创的站内交易系统。内置积分体系，用户可发布闲置，系统自动完成扣款与结算通知。</p>
             </div>
             <div class="feature-card">
-                <h3>🤖 AI 助手</h3>
+                <h3>🤖 AI 助手集成</h3>
                 <p>无缝接入大语言模型。支持站内内容检索与上下文聊天，兼容任意 OpenAI 格式接口。</p>
             </div>
             <div class="feature-card">
                 <h3>🎭 绝对隐私</h3>
-                <p>完善的匿名发帖与私聊机制。支持 Markdown 语法，保护学生群体的真实表达。</p>
+                <p>完善的匿名发帖与私聊撤回机制。支持 Markdown 语法，保护用户群体的真实表达。</p>
             </div>
             <div class="feature-card">
-                <h3>💸 免费白嫖</h3>
-                <p>极致轻量，适配 InfinityFree 等免费虚拟主机。无需昂贵的服务器，0 成本建站。</p>
+                <h3>⚡ 极致轻量</h3>
+                <p>摒弃传统框架的繁文缛节，原生代码直击核心。代码结构清晰，是学习 PHP Web 开发的绝佳案例。</p>
             </div>
         </div>
     </div>
 
     <footer>
-        © 2026 PHPSchool · 基于 <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a> 开源 · 由 DEEPSEEK 协助开发
+        © 2026 PHPSchool · 基于 <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a> 开源<br>
+        注：本项目核心逻辑采用 AI 辅助生成，代码开源供学习交流。在生产环境部署前，建议进行充分的安全审计与测试。
     </footer>
 
     <script>
         async function fetchReleases() {
-            const repo = 'BA4QZP/PHPSchool';
+            // 注意：如果你转移了仓库，这里的 repo 记得改成 新组织名/PHPSchool
+            const repo = 'BA4QZP/PHPSchool'; 
             const demoUrl = 'https://phpschool.gt.tc';
-            const badgesEl = document.getElementById('version-badges');
+            const badgesEl = document.getElementById('version-text');
             const btnsEl = document.getElementById('download-buttons');
             
             const demoBtn = `<a href="${demoUrl}" class="btn btn-demo" target="_blank">🌐 在线演示</a>`;
@@ -131,7 +128,8 @@
                 const releases = await res.json();
                 
                 if (releases.length === 0) {
-                    badgesEl.innerHTML = '<div class="badge badge-loading">暂无发布版本</div>';
+                    badgesEl.className = 'badge badge-loading';
+                    badgesEl.innerText = '暂无发布版本';
                     btnsEl.innerHTML = demoBtn + repoBtn;
                     return;
                 }
@@ -139,34 +137,23 @@
                 const latestStable = releases.find(r => r.prerelease === false);
                 const latestPre = releases.find(r => r.prerelease === true);
 
-                let badgesHTML = '';
                 let buttonsHTML = demoBtn;
 
-                if (latestStable && latestPre) {
-                    badgesHTML += `<div class="badge badge-stable">稳定版 ${latestStable.tag_name}</div>`;
-                    if (releases[0].prerelease === true) {
-                        badgesHTML += `<div class="badge badge-pre">最新开发 ${latestPre.tag_name}</div>`;
-                    }
-                    buttonsHTML += `
-                        <a href="${latestStable.html_url}" class="btn btn-primary">⬇️ 下载稳定版</a>
-                        <a href="${latestPre.html_url}" class="btn btn-secondary">下载测试版</a>
-                    `;
-                } else if (latestStable) {
-                    badgesHTML += `<div class="badge badge-stable">最新稳定版 ${latestStable.tag_name}</div>`;
+                if (latestStable) {
+                    badgesEl.className = 'badge badge-stable';
+                    badgesEl.innerText = `最新稳定版 ${latestStable.tag_name}`;
                     buttonsHTML += `<a href="${latestStable.html_url}" class="btn btn-primary">⬇️ 下载稳定版</a>`;
                 } else if (latestPre) {
-                    badgesHTML += `<div class="badge badge-pre">开发版 ${latestPre.tag_name}</div>`;
+                    badgesEl.className = 'badge badge-pre';
+                    badgesEl.innerText = `最新开发版 ${latestPre.tag_name}`;
                     buttonsHTML += `<a href="${latestPre.html_url}" class="btn btn-primary">⬇️ 下载测试版</a>`;
                 }
 
-                buttonsHTML += repoBtn;
-
-                badgesEl.innerHTML = badgesHTML;
-                btnsEl.innerHTML = buttonsHTML;
+                btnsEl.innerHTML = buttonsHTML + repoBtn;
 
             } catch (error) {
-                console.warn('获取 GitHub Release 失败:', error);
-                badgesEl.innerHTML = '<div class="badge badge-loading">获取版本失败</div>';
+                badgesEl.className = 'badge badge-loading';
+                badgesEl.innerText = '获取版本失败';
                 btnsEl.innerHTML = demoBtn + repoBtn;
             }
         }

@@ -45,6 +45,8 @@
         .btn-primary:hover { background-color: var(--primary-hover); transform: translateY(-2px); }
         .btn-secondary { background-color: transparent; color: var(--text); border: 1px solid var(--border); }
         .btn-secondary:hover { background-color: var(--card); border-color: var(--text-muted); }
+        .btn-demo { background-color: #10b981; color: white; }
+        .btn-demo:hover { background-color: #059669; transform: translateY(-2px); }
         
         .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; text-align: left; }
         .feature-card {
@@ -73,11 +75,12 @@
             <div class="badge badge-loading">正在获取版本信息...</div>
         </div>
         
-        <h1>Campus<span>Wall</span></h1>
+        <h1>PHP<span>School</span></h1>
         <p class="subtitle">专为校园场景打造的轻量级树洞、匿名论坛与积分集市。无需繁琐配置，一包代码，即刻上线。</p>
         
         <div class="btns" id="download-buttons">
-            <a href="https://github.com/BA4QZP/CampusWall" class="btn btn-primary">前往 GitHub 仓库</a>
+            <a href="https://phpschool.gt.tc" class="btn btn-demo" target="_blank">🌐 在线演示</a>
+            <a href="https://github.com/BA4QZP/PHPSchool" class="btn btn-primary">前往 GitHub 仓库</a>
         </div>
 
         <div class="features">
@@ -115,8 +118,12 @@
     <script>
         async function fetchReleases() {
             const repo = 'BA4QZP/PHPSchool';
+            const demoUrl = 'https://phpschool.gt.tc';
             const badgesEl = document.getElementById('version-badges');
             const btnsEl = document.getElementById('download-buttons');
+            
+            const demoBtn = `<a href="${demoUrl}" class="btn btn-demo" target="_blank">🌐 在线演示</a>`;
+            const repoBtn = `<a href="https://github.com/${repo}" class="btn btn-secondary">前往 GitHub 仓库</a>`;
             
             try {
                 const res = await fetch(`https://api.github.com/repos/${repo}/releases`);
@@ -125,6 +132,7 @@
                 
                 if (releases.length === 0) {
                     badgesEl.innerHTML = '<div class="badge badge-loading">暂无发布版本</div>';
+                    btnsEl.innerHTML = demoBtn + repoBtn;
                     return;
                 }
 
@@ -132,26 +140,26 @@
                 const latestPre = releases.find(r => r.prerelease === true);
 
                 let badgesHTML = '';
-                let buttonsHTML = '';
+                let buttonsHTML = demoBtn;
 
                 if (latestStable && latestPre) {
                     badgesHTML += `<div class="badge badge-stable">稳定版 ${latestStable.tag_name}</div>`;
                     if (releases[0].prerelease === true) {
                         badgesHTML += `<div class="badge badge-pre">最新开发 ${latestPre.tag_name}</div>`;
                     }
-                    buttonsHTML = `
+                    buttonsHTML += `
                         <a href="${latestStable.html_url}" class="btn btn-primary">⬇️ 下载稳定版</a>
                         <a href="${latestPre.html_url}" class="btn btn-secondary">下载测试版</a>
                     `;
                 } else if (latestStable) {
                     badgesHTML += `<div class="badge badge-stable">最新稳定版 ${latestStable.tag_name}</div>`;
-                    buttonsHTML = `<a href="${latestStable.html_url}" class="btn btn-primary">⬇️ 下载稳定版</a>`;
+                    buttonsHTML += `<a href="${latestStable.html_url}" class="btn btn-primary">⬇️ 下载稳定版</a>`;
                 } else if (latestPre) {
                     badgesHTML += `<div class="badge badge-pre">开发版 ${latestPre.tag_name}</div>`;
-                    buttonsHTML = `<a href="${latestPre.html_url}" class="btn btn-primary">⬇️ 下载测试版</a>`;
+                    buttonsHTML += `<a href="${latestPre.html_url}" class="btn btn-primary">⬇️ 下载测试版</a>`;
                 }
 
-                buttonsHTML += `<a href="https://github.com/${repo}" class="btn btn-secondary">前往 GitHub 仓库</a>`;
+                buttonsHTML += repoBtn;
 
                 badgesEl.innerHTML = badgesHTML;
                 btnsEl.innerHTML = buttonsHTML;
@@ -159,7 +167,7 @@
             } catch (error) {
                 console.warn('获取 GitHub Release 失败:', error);
                 badgesEl.innerHTML = '<div class="badge badge-loading">获取版本失败</div>';
-                btnsEl.innerHTML = `<a href="https://github.com/${repo}" class="btn btn-primary">前往 GitHub 仓库</a>`;
+                btnsEl.innerHTML = demoBtn + repoBtn;
             }
         }
 

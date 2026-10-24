@@ -7,8 +7,11 @@
 
 PHPSchool 是一个基于原生 PHP 开发的极简校园墙 / 树洞系统。**无需 Composer，零外部依赖**，专为 InfinityFree 等免费虚拟主机设计，上传即可完成一键建站。
 
-## 🌐 在线演示
+### 🚀 快速下载
+- [**⬇️ 下载最新版 (.zip)**](https://github.com/BA4QZP/PHPSchool/releases/latest) （前往 Releases 页面）
+- [**直接下载主分支源码**](https://github.com/BA4QZP/PHPSchool/archive/refs/heads/main.zip)
 
+### 🌐 在线演示
 [https://phpschool.gt.tc](https://phpschool.gt.tc)
 
 ## ✨ 核心特性
@@ -21,9 +24,9 @@ PHPSchool 是一个基于原生 PHP 开发的极简校园墙 / 树洞系统。**
 - **🛒 积分集市**：轻量级的站内交易系统，支持带图发布、积分扣款、售出通知等完整闭环。
 - **🤖 AI 助手扩展**：预留 OpenAI 兼容接口，在 `.env` 中填入 API Key 即可开启站内 AI 对话。
 
-## 📦 快速部署
+## 📦 部署指南
 
-1. 在 [Releases](https://github.com/BA4QZP/PHPSchool/releases) 页面下载最新版本的 `.zip` 压缩包。
+1. 点击上方链接下载最新版本的 `.zip` 压缩包。
 2. 解压并将所有文件上传至你的网站根目录。
 3. 在浏览器中访问 `http://你的域名/install.php`，按提示填写数据库信息和超管账号。
 4. **安装完成后，请务必删除 `install.php` 文件**，并在后台绑定你的域名。

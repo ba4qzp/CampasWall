@@ -1,0 +1,22 @@
+:root { --main:#2563eb; --green:#059669; --red:#dc2626; --gray:#6b7280; --bg:#fafafa; --text:#222; --border:#ddd; }
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;max-width:840px;margin:16px auto;padding:0 12px;color:var(--text);background:var(--bg);font-size:14px;line-height:1.5;}
+a{color:var(--main);text-decoration:none} img{max-width:100%;height:auto}
+.card,.post{border:1px solid var(--border);border-radius:6px;padding:12px;margin:10px 0;background:#fff}
+.meta{color:#777;font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.meta img,.meta .av{width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle}
+.fl{display:inline-block;padding:5px 12px;background:var(--main);color:#fff;border-radius:4px;text-decoration:none;font-size:13px;margin:3px 5px 3px 0;border:0;cursor:pointer;font-family:inherit;}
+.fl:hover{opacity:.9} .fl.gray{background:var(--gray)} .fl.green{background:var(--green)} .fl.red{background:var(--red)}
+input,textarea,select,button{font:inherit;padding:6px;margin:4px 0;border:1px solid #ccc;border-radius:4px;background:#fff;}
+textarea,input[type=text],input[type=password],input[type=email]{width:100%}
+button{cursor:pointer;background:var(--main);color:#fff;border:0;padding:7px 14px;border-radius:4px}
+table{width:100%;border-collapse:collapse;margin-top:8px} th,td{border:1px solid var(--border);padding:4px 6px;font-size:13px;text-align:left}
+.nav{margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)} .nav a{margin-right:12px}
+.footer{color:#888;font-size:12px;text-align:center;margin:24px 0;padding-top:8px;border-top:1px solid var(--border)}
+.hint{color:#888;font-size:12px} .err{color:#c00} .ok{color:#080}
+.badge-ok{background:#bbf7d0;color:#166534;padding:1px 6px;border-radius:4px;font-size:11px}
+.badge-warn{background:#fed7aa;color:#9a3412;padding:1px 6px;border-radius:4px;font-size:11px}
+.badge-super{background:#fde68a;color:#92400e;padding:1px 6px;border-radius:4px;font-size:11px}
+.avatar{width:72px;height:72px;border-radius:50%;object-fit:cover;} .avatar-default{width:72px;height:72px;border-radius:50%;background:var(--main);color:#fff;display:flex;align-items:center;justify-content:center;font-size:28px}
+.msg-bubble{padding:8px 12px;border-radius:6px;max-width:80%;word-break:break-word;margin:8px 0;}
+.msg-me{background:#dbeafe;margin-left:auto;} .msg-other{background:#f5f5f5;}

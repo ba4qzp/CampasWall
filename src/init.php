@@ -9,7 +9,7 @@ foreach ($lines as $line) {
     if (!array_key_exists($name, $_ENV)) { putenv("{$name}={$value}"); $_ENV[$name] = $value; }
 }
 
-define('SITE_NAME', getenv('SITE_NAME') ?: 'CampusWall');
+define('SITE_NAME', getenv('SITE_NAME') ?: 'PHPSchool');
 define('SITE_URL', getenv('SITE_URL') ?: 'http://localhost');
 define('ADMIN_EMAIL', getenv('ADMIN_EMAIL') ?: 'admin@example.com');
 define('ALLOW_REGISTER', getenv('ALLOW_REGISTER') === 'true');

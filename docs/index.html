@@ -8,7 +8,7 @@
         :root {
             --bg: #0f172a; --text: #f8fafc; --text-muted: #94a3b8;
             --primary: #3b82f6; --primary-hover: #2563eb;
-            --card: #1e293b; --border: #334155; --warn: #eab308;
+            --card: #1e293b; --border: #334155; --warn: #eab308; --warn-bg: rgba(234, 179, 8, 0.15);
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -17,18 +17,24 @@
             display: flex; flex-direction: column; min-height: 100vh; text-align: center;
         }
         .top-warn {
-            background-color: rgba(234, 179, 8, 0.15); color: var(--warn);
+            background-color: var(--warn-bg); color: var(--warn);
             padding: 10px 20px; font-size: 14px; border-bottom: 1px solid rgba(234, 179, 8, 0.3);
             font-weight: 500;
         }
         .container { max-width: 900px; margin: 0 auto; padding: 60px 20px; flex: 1; }
+        
+        .badge-group { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; }
         .badge {
-            display: inline-block; padding: 4px 12px; background-color: rgba(59, 130, 246, 0.1);
-            color: var(--primary); border-radius: 20px; font-size: 14px; font-weight: 600; margin-bottom: 20px;
+            display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 600;
         }
+        .badge-stable { background-color: rgba(59, 130, 246, 0.1); color: var(--primary); }
+        .badge-pre { background-color: var(--warn-bg); color: var(--warn); border: 1px solid rgba(234, 179, 8, 0.3); }
+        .badge-loading { background-color: var(--border); color: var(--text-muted); }
+
         h1 { font-size: 3rem; font-weight: 800; margin-bottom: 20px; letter-spacing: -0.02em; }
         h1 span { background: linear-gradient(90deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         p.subtitle { font-size: 1.2rem; color: var(--text-muted); margin-bottom: 40px; max-width: 600px; margin-left: auto; margin-right: auto; }
+        
         .btns { display: flex; gap: 16px; justify-content: center; margin-bottom: 60px; flex-wrap: wrap; }
         .btn {
             display: inline-flex; align-items: center; justify-content: center;
@@ -39,6 +45,7 @@
         .btn-primary:hover { background-color: var(--primary-hover); transform: translateY(-2px); }
         .btn-secondary { background-color: transparent; color: var(--text); border: 1px solid var(--border); }
         .btn-secondary:hover { background-color: var(--card); border-color: var(--text-muted); }
+        
         .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; text-align: left; }
         .feature-card {
             background-color: var(--card); padding: 24px; border-radius: 12px;
@@ -62,13 +69,15 @@
     </div>
 
     <div class="container">
-        <div class="badge">v1.0.0 全新开源发布</div>
+        <div class="badge-group" id="version-badges">
+            <div class="badge badge-loading">正在获取版本信息...</div>
+        </div>
+        
         <h1>Campus<span>Wall</span></h1>
         <p class="subtitle">专为校园场景打造的轻量级树洞、匿名论坛与积分集市。无需繁琐配置，一包代码，即刻上线。</p>
         
-        <div class="btns">
+        <div class="btns" id="download-buttons">
             <a href="https://github.com/BA4QZP/CampusWall" class="btn btn-primary">前往 GitHub 仓库</a>
-            <a href="https://github.com/BA4QZP/CampusWall/releases/latest" class="btn btn-secondary">⬇️ 下载最新源码</a>
         </div>
 
         <div class="features">
@@ -103,5 +112,58 @@
         © 2026 CampusWall · 基于 <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a> 开源 · 由 DEEPSEEK 协助开发
     </footer>
 
+    <script>
+        async function fetchReleases() {
+            const repo = 'BA4QZP/CampusWall';
+            const badgesEl = document.getElementById('version-badges');
+            const btnsEl = document.getElementById('download-buttons');
+            
+            try {
+                const res = await fetch(`https://api.github.com/repos/${repo}/releases`);
+                if (!res.ok) throw new Error('API Request Failed');
+                const releases = await res.json();
+                
+                if (releases.length === 0) {
+                    badgesEl.innerHTML = '<div class="badge badge-loading">暂无发布版本</div>';
+                    return;
+                }
+
+                const latestStable = releases.find(r => r.prerelease === false);
+                const latestPre = releases.find(r => r.prerelease === true);
+
+                let badgesHTML = '';
+                let buttonsHTML = '';
+
+                if (latestStable && latestPre) {
+                    badgesHTML += `<div class="badge badge-stable">稳定版 ${latestStable.tag_name}</div>`;
+                    if (releases[0].prerelease === true) {
+                        badgesHTML += `<div class="badge badge-pre">最新开发 ${latestPre.tag_name}</div>`;
+                    }
+                    buttonsHTML = `
+                        <a href="${latestStable.html_url}" class="btn btn-primary">⬇️ 下载稳定版</a>
+                        <a href="${latestPre.html_url}" class="btn btn-secondary">下载测试版</a>
+                    `;
+                } else if (latestStable) {
+                    badgesHTML += `<div class="badge badge-stable">最新稳定版 ${latestStable.tag_name}</div>`;
+                    buttonsHTML = `<a href="${latestStable.html_url}" class="btn btn-primary">⬇️ 下载稳定版</a>`;
+                } else if (latestPre) {
+                    badgesHTML += `<div class="badge badge-pre">开发版 ${latestPre.tag_name}</div>`;
+                    buttonsHTML = `<a href="${latestPre.html_url}" class="btn btn-primary">⬇️ 下载测试版</a>`;
+                }
+
+                buttonsHTML += `<a href="https://github.com/${repo}" class="btn btn-secondary">前往 GitHub 仓库</a>`;
+
+                badgesEl.innerHTML = badgesHTML;
+                btnsEl.innerHTML = buttonsHTML;
+
+            } catch (error) {
+                console.warn('获取 GitHub Release 失败:', error);
+                badgesEl.innerHTML = '<div class="badge badge-loading">获取版本失败</div>';
+                btnsEl.innerHTML = `<a href="https://github.com/${repo}" class="btn btn-primary">前往 GitHub 仓库</a>`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', fetchReleases);
+    </script>
 </body>
 </html>

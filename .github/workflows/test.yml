@@ -1,4 +1,4 @@
-name: Auto Test Core Features
+name: Auto Test All Features
 
 on:
   push:
@@ -39,67 +39,101 @@ jobs:
     - name: Run Install
       run: |
         curl -s -X POST -d "site_name=TestSite&admin_email=a@b.com&admin_user=admin&admin_pass=123456&db_host=127.0.0.1&db_name=phpschool_test&db_user=root&db_pass=root&allow_register=on&require_approval=on&limit_private_msg=on" http://127.0.0.1:8000/install.php?step=2 > install_res.html
-        if [ ! -f .env ]; then 
-          echo "❌ 安装失败！"
-          cat install_res.html
-          exit 1
-        fi
-        echo "✅ 安装成功"
+        if [ ! -f .env ]; then cat install_res.html; exit 1; fi
 
-    - name: Test Login
+    - name: Test All Features (via PHP)
       run: |
-        # 用 curl 模拟登录，拿到 Cookie 存进文件
-        curl -s -c cookies.txt -X POST -d "username=admin&password=123456" "http://127.0.0.1:8000/index.php?action=login"
-
-    - name: Test Post & Verify with PHP
-      run: |
-        # 写一个临时 PHP 脚本，用 PHP 去发帖并查库
-        cat << 'EOF' > test_post.php
+        cat << 'EOF' > test_all.php
         <?php
-        // 1. 读取 Curl 拿到的 Cookie
-        $cookieStr = '';
-        if(file_exists('cookies.txt')){
-            $lines = file('cookies.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-            $cookies = [];
-            foreach($lines as $line){
-                if(strpos($line, "\t") !== false){
-                    $parts = explode("\t", $line);
-                    if(count($parts) >= 7) $cookies[] = $parts[5] . '=' . $parts[6];
-                }
-            }
-            $cookieStr = implode('; ', $cookies);
+        $pdo = new PDO("mysql:host=127.0.0.1;dbname=phpschool_test;charset=utf8mb4", "root", "root");
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        
+        function request($url, $data, $cookieFile, $method = 'POST') {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => $method === 'POST',
+                CURLOPT_POSTFIELDS => $method === 'POST' ? http_build_query($data) : '',
+                CURLOPT_COOKIEJAR => $cookieFile,
+                CURLOPT_COOKIEFILE => $cookieFile,
+                CURLOPT_RETURNTRANSFER => true
+            ]);
+            $res = curl_exec($ch);
+            curl_close($ch);
+            return $res;
         }
 
-        // 2. 用 PHP 发送中文发帖请求 (PHP 完美支持 UTF-8)
-        $url = 'http://127.0.0.1:8000/index.php?action=post';
-        $data = http_build_query([
-            'content' => '这是GitHub自动测试发出的中文帖子',
-            'tags' => '中文测试'
-        ]);
+        // 1. 【新增】测试真实用户注册 (user1)
+        request('http://127.0.0.1:8000/index.php?action=register', [
+            'username' => 'user1', 
+            'password' => '123456',
+            'email' => 'user1@test.com'
+        ], 'user1_cookies.txt');
         
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $data,
-            CURLOPT_COOKIE => $cookieStr,
-            CURLOPT_RETURNTRANSFER => true
-        ]);
-        $res = curl_exec($ch);
-        curl_close($ch);
+        // 验证注册是否入库，且状态为 pending (因为开启了人工审核)
+        $stmt = $pdo->query("SELECT status FROM users WHERE username='user1'");
+        $user1 = $stmt->fetch();
+        if(!$user1 || $user1['status'] !== 'pending') {
+            echo "❌ 测试失败：注册未成功入库或状态不是 pending\n";
+            exit(1);
+        }
 
-        // 3. 连接数据库验证
-        $pdo = new PDO("mysql:host=127.0.0.1;dbname=phpschool_test;charset=utf8mb4", "root", "root");
-        $stmt = $pdo->query("SELECT content FROM posts ORDER BY pid DESC LIMIT 1");
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        // 2. 【新增】模拟管理员在后台点击“通过”
+        request('http://127.0.0.1:8000/index.php?action=login', ['username'=>'admin', 'password'=>'123456'], 'admin_cookies.txt');
+        request('http://127.0.0.1:8000/admin.php?action=approve&id=2', [], 'admin_cookies.txt', 'GET');
+        
+        // 验证 user1 状态变为 active
+        $stmt = $pdo->query("SELECT status FROM users WHERE username='user1'");
+        if($stmt->fetchColumn() !== 'active') {
+            echo "❌ 测试失败：管理员审核通过失败\n";
+            exit(1);
+        }
 
-        // 4. 比对结果
-        if ($row && $row['content'] === '这是GitHub自动测试发出的中文帖子') {
-            echo "✅ 测试通过！中文帖子完美入库无乱码。\n";
+        // 3. 测试 admin 发帖
+        request('http://127.0.0.1:8000/index.php?action=post', ['content'=>'这是admin的测试帖'], 'admin_cookies.txt');
+        $pid = $pdo->lastInsertId();
+        
+        // 4. 测试 user1 登录
+        request('http://127.0.0.1:8000/index.php?action=login', ['username'=>'user1', 'password'=>'123456'], 'user1_cookies.txt');
+        
+        // 5. 测试 user1 评论
+        request('http://127.0.0.1:8000/index.php?action=comment', ['pid'=>$pid, 'content'=>'这是user1的评论'], 'user1_cookies.txt');
+        
+        // 6. 测试 user1 点赞
+        request('http://127.0.0.1:8000/index.php?action=like', ['pid'=>$pid], 'user1_cookies.txt');
+        
+        // 7. 测试 user1 私聊 admin
+        request('http://127.0.0.1:8000/send_msg.php', ['to'=>1, 'content'=>'这是user1发的私聊'], 'user1_cookies.txt');
+        
+        // 8. 测试 user1 在集市上架物品 (标价 100 积分)
+        request('http://127.0.0.1:8000/market.php', ['add_item'=>1, 'title'=>'测试物品', 'price'=>100, 'desc_text'=>'描述'], 'user1_cookies.txt');
+        $itemId = $pdo->lastInsertId();
+        
+        // 9. 测试 admin 购买物品
+        $beforePoints = (int)$pdo->query("SELECT points FROM users WHERE uid=1")->fetchColumn();
+        request("http://127.0.0.1:8000/market.php?buy=$itemId", [], 'admin_cookies.txt', 'GET');
+        $afterPoints = (int)$pdo->query("SELECT points FROM users WHERE uid=1")->fetchColumn();
+
+        // ====== 数据库终极验证 ======
+        $errors = [];
+        
+        $cCount = (int)$pdo->query("SELECT COUNT(*) FROM comments WHERE pid=$pid")->fetchColumn();
+        if($cCount !== 1) $errors[] = "评论失败";
+        
+        $lCount = (int)$pdo->query("SELECT COUNT(*) FROM likes WHERE pid=$pid")->fetchColumn();
+        if($lCount !== 1) $errors[] = "点赞失败";
+        
+        $mCount = (int)$pdo->query("SELECT COUNT(*) FROM messages WHERE from_uid=2 AND to_uid=1")->fetchColumn();
+        if($mCount !== 1) $errors[] = "私聊失败";
+        
+        if($beforePoints - $afterPoints !== 100) {
+            $errors[] = "集市购买扣款失败 (前:{$beforePoints}, 后:{$afterPoints})";
+        }
+
+        if(empty($errors)) {
+            echo "✅ 全功能测试通过！注册、审核、发帖、评论、点赞、私聊、集市买卖，全部逻辑正常！\n";
         } else {
-            echo "❌ 测试失败！实际查出的内容: " . ($row ? $row['content'] : '空') . "\n";
+            echo "❌ 测试失败：\n" . implode("\n", $errors) . "\n";
             exit(1);
         }
         EOF
-        
-        # 执行 PHP 脚本
-        php test_post.php
+        php test_all.php

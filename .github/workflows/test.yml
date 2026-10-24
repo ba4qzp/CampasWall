@@ -44,37 +44,62 @@ jobs:
           cat install_res.html
           exit 1
         fi
-        echo "✅ 安装成功，.env 已生成"
+        echo "✅ 安装成功"
 
-    - name: Test Login & Post
-      env:
-        LANG: C.UTF-8
-        LC_ALL: C.UTF-8
+    - name: Test Login
       run: |
-        # 模拟登录
+        # 用 curl 模拟登录，拿到 Cookie 存进文件
         curl -s -c cookies.txt -X POST -d "username=admin&password=123456" "http://127.0.0.1:8000/index.php?action=login"
-        
-        # 模拟发帖（用 --data-urlencode 发送中文）
-        curl -s -b cookies.txt -X POST \
-          --data-urlencode "content=这是GitHub自动测试发出的中文帖子" \
-          --data-urlencode "tags=中文测试" \
-          "http://127.0.0.1:8000/index.php?action=post"
-        
-        echo "✅ 登录和中文发帖请求已发送"
 
-    - name: Verify Database
-      env:
-        LANG: C.UTF-8
-        LC_ALL: C.UTF-8
+    - name: Test Post & Verify with PHP
       run: |
-        # 连库时强制指定 utf8mb4，查出中文
-        mysql --default-character-set=utf8mb4 -h 127.0.0.1 -u root -proot phpschool_test -e "SELECT content FROM posts;" > db_res.txt
+        # 写一个临时 PHP 脚本，用 PHP 去发帖并查库
+        cat << 'EOF' > test_post.php
+        <?php
+        // 1. 读取 Curl 拿到的 Cookie
+        $cookieStr = '';
+        if(file_exists('cookies.txt')){
+            $lines = file('cookies.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            $cookies = [];
+            foreach($lines as $line){
+                if(strpos($line, "\t") !== false){
+                    $parts = explode("\t", $line);
+                    if(count($parts) >= 7) $cookies[] = $parts[5] . '=' . $parts[6];
+                }
+            }
+            $cookieStr = implode('; ', $cookies);
+        }
+
+        // 2. 用 PHP 发送中文发帖请求 (PHP 完美支持 UTF-8)
+        $url = 'http://127.0.0.1:8000/index.php?action=post';
+        $data = http_build_query([
+            'content' => '这是GitHub自动测试发出的中文帖子',
+            'tags' => '中文测试'
+        ]);
         
-        # 检查中文是否完好无损
-        if grep -q "这是GitHub自动测试发出的中文帖子" db_res.txt; then
-          echo "✅ 测试通过！中文帖子成功写入数据库且无乱码。"
-        else
-          echo "❌ 测试失败！当前数据库内容如下："
-          cat db_res.txt
-          exit 1
-        fi
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_COOKIE => $cookieStr,
+            CURLOPT_RETURNTRANSFER => true
+        ]);
+        $res = curl_exec($ch);
+        curl_close($ch);
+
+        // 3. 连接数据库验证
+        $pdo = new PDO("mysql:host=127.0.0.1;dbname=phpschool_test;charset=utf8mb4", "root", "root");
+        $stmt = $pdo->query("SELECT content FROM posts ORDER BY pid DESC LIMIT 1");
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        // 4. 比对结果
+        if ($row && $row['content'] === '这是GitHub自动测试发出的中文帖子') {
+            echo "✅ 测试通过！中文帖子完美入库无乱码。\n";
+        } else {
+            echo "❌ 测试失败！实际查出的内容: " . ($row ? $row['content'] : '空') . "\n";
+            exit(1);
+        }
+        EOF
+        
+        # 执行 PHP 脚本
+        php test_post.php

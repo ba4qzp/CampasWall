@@ -8,30 +8,31 @@ if(!$urow || (int)$urow['is_admin'] !== 1){ die('无权访问后台'); }
 $is_super = ($uid === SUPER_UID);
 $msg = '';
 
-// ==================== 处理 POST 请求 ====================
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $mode = $_POST['mode'] ?? '';
 
-    // 1. 更新公告
     if($mode === 'announce'){
         $content = trim($_POST['content'] ?? '');
         $pdo->prepare('UPDATE announcements SET content = ? WHERE aid = 1')->execute([$content]);
         $msg = '公告已更新';
     }
     
-    // 2. 修改用户资料 (积分、密码等)
     if($mode === 'edit_user'){
         $tid = (int)$_POST['tid'];
         $new_points = (int)$_POST['points'];
         $new_pwd = trim($_POST['newpwd'] ?? '');
         
-        $stmt = $pdo->prepare('SELECT points FROM users WHERE uid = ?'); $stmt->execute([$tid]); $old_points = (int)$stmt->fetchColumn();
+        $stmt = $pdo->prepare('SELECT points FROM users WHERE uid = ?'); 
+        $stmt->execute([$tid]); 
+        $old_points = (int)$stmt->fetchColumn();
         
+        // ★ 允许超管修改任何人（包括自己）的积分
         if($new_points !== $old_points){
             $delta = $new_points - $old_points;
             add_points($pdo, $tid, $delta, 'admin_adjust', $uid);
-            // 记录管理员操作
-            $pdo->prepare('INSERT INTO user_actions (uid, admin_uid, action, detail) VALUES (?,?,?,?)')->execute([$tid, $uid, '积分变更', '管理员将你的积分调整了 '.($delta>0?'+':'').$delta]);
+            if($tid !== $uid) {
+                $pdo->prepare('INSERT INTO user_actions (uid, admin_uid, action, detail) VALUES (?,?,?,?)')->execute([$tid, $uid, '积分变更', '管理员将你的积分调整了 '.($delta>0?'+':'').$delta]);
+            }
         }
         if($new_pwd !== ''){
             $pdo->prepare('UPDATE users SET password_hash = ? WHERE uid = ?')->execute([password_hash($new_pwd, PASSWORD_DEFAULT), $tid]);
@@ -40,24 +41,17 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
     }
 }
 
-// ==================== 处理 GET 请求 ====================
 $action = $_GET['action'] ?? '';
 
-// 审核通过
 if($action === 'approve' && isset($_GET['id'])){
     $pdo->prepare('UPDATE users SET status = "active" WHERE uid = ?')->execute([(int)$_GET['id']]);
     $pdo->prepare('INSERT INTO user_actions (uid, admin_uid, action, detail) VALUES (?,?,?,?)')->execute([(int)$_GET['id'], $uid, '注册通过', '你的注册申请已通过']);
     header('Location: admin.php'); exit;
 }
-
-// 拒绝审核 (直接删)
 if($action === 'reject' && isset($_GET['id'])){
-    $tid = (int)$_GET['id'];
-    $pdo->prepare('DELETE FROM users WHERE uid = ? AND status = "pending"')->execute([$tid]);
+    $pdo->prepare('DELETE FROM users WHERE uid = ? AND status = "pending"')->execute([(int)$_GET['id']]);
     header('Location: admin.php'); exit;
 }
-
-// 冻结/解冻
 if($action === 'toggle_ban' && isset($_GET['id'])){
     $tid = (int)$_GET['id'];
     if($tid !== $uid){
@@ -66,8 +60,6 @@ if($action === 'toggle_ban' && isset($_GET['id'])){
     }
     header('Location: admin.php'); exit;
 }
-
-// 提权/降权 (仅超管)
 if($action === 'toggle_admin' && isset($_GET['id']) && $is_super){
     $tid = (int)$_GET['id'];
     if($tid !== $uid && $tid !== SUPER_UID){
@@ -75,8 +67,6 @@ if($action === 'toggle_admin' && isset($_GET['id']) && $is_super){
     }
     header('Location: admin.php'); exit;
 }
-
-// 删帖
 if($action === 'del_post' && isset($_GET['id'])){
     $pid = (int)$_GET['id'];
     $stmt = $pdo->prepare('SELECT uid FROM posts WHERE pid = ?'); $stmt->execute([$pid]); $post_owner = $stmt->fetchColumn();
@@ -89,8 +79,6 @@ if($action === 'del_post' && isset($_GET['id'])){
     }
     header('Location: admin.php?tab=posts'); exit;
 }
-
-// 删集市
 if($action === 'del_market' && isset($_GET['id'])){
     $id = (int)$_GET['id'];
     $stmt = $pdo->prepare('SELECT uid FROM market_items WHERE id = ?'); $stmt->execute([$id]); $m_owner = $stmt->fetchColumn();
@@ -103,11 +91,8 @@ if($action === 'del_market' && isset($_GET['id'])){
     header('Location: admin.php?tab=market'); exit;
 }
 
-// 限制/放开私聊 (这里简单用用户状态字段扩展，或者暂时不需要)
-// 获取当前 Tab
 $tab = $_GET['tab'] ?? 'dashboard';
 
-// 拉取数据
 $ann = $pdo->query('SELECT content FROM announcements WHERE aid = 1')->fetchColumn();
 $pending_users = $pdo->query('SELECT * FROM users WHERE status = "pending" ORDER BY uid ASC')->fetchAll();
 $users = $pdo->query('SELECT * FROM users ORDER BY uid DESC LIMIT 100')->fetchAll();
@@ -137,7 +122,6 @@ th { background: #fafafa; }
 
 <?php if($msg): ?><div class="ok" style="margin-bottom:10px;padding:10px;background:#e8f5e9;border-radius:4px"><?=h($msg)?></div><?php endif; ?>
 
-<!-- 概览与公告 -->
 <?php if($tab === 'dashboard'): ?>
     <div class="card">
         <h3>系统数据</h3>
@@ -154,7 +138,6 @@ th { background: #fafafa; }
     </div>
 <?php endif; ?>
 
-<!-- 用户管理 -->
 <?php if($tab === 'users'): ?>
     <?php if($pending_users): ?>
     <div class="card" style="border: 1px solid #f5c6cb; background: #fff8f8;">
@@ -193,14 +176,14 @@ th { background: #fafafa; }
                             <?php if($is_super && $u['uid'] != SUPER_UID): ?>
                                 <a href="?action=toggle_admin&id=<?=$u['uid']?>" class="fl btn-sm"><?=$u['is_admin']?'降权':'提权'?></a>
                             <?php endif; ?>
-                            <button class="btn-sm" onclick="editUser(<?=$u['uid']?>, '<?=h($u['username'])?>', <?=$u['points']?>)">修改</button>
                         <?php endif; ?>
+                        <!-- 超管可以修改自己的积分了 -->
+                        <button class="btn-sm" onclick="editUser(<?=$u['uid']?>, '<?=h($u['username'])?>', <?=$u['points']?>)">修改</button>
                     </td>
                 </tr>
             <?php endforeach; ?>
         </table>
     </div>
-    <!-- 修改用户弹窗 -->
     <div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);align-items:center;justify-content:center;z-index:999">
         <div style="background:#fff;padding:20px;border-radius:8px;width:300px">
             <h3 id="eu_title"></h3>
@@ -213,6 +196,76 @@ th { background: #fafafa; }
                 <input type="text" name="newpwd" style="width:100%">
                 <div style="margin-top:10px;text-align:right">
                     <button type="button" class="fl gray" onclick="document.getElementById('editModal').style.display='none'">取消</button>
+                    <button type="submit" class="fl">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+    function editUser(id, name, pts){
+        document.getElementById('eu_id').value = id;
+        document.getElementById('eu_title').innerText = '修改用户: ' + name;
+        document.getElementById('eu_points').value = pts;
+        document.getElementById('editModal').style.display = 'flex';
+    }
+    </script>
+<?php endif; ?>
+
+<?php if($tab === 'posts'): ?>
+    <div class="card">
+        <h3>最新帖子</h3>
+        <table>
+            <tr><th>PID</th><th>作者</th><th>内容 (截取)</th><th>时间</th><th>操作</th></tr>
+            <?php foreach($posts as $p): ?>
+                <tr>
+                    <td><?=$p['pid']?></td>
+                    <td><?=h($p['username'])?></td>
+                    <td><?=h(mb_substr($p['content'], 0, 30))?>...</td>
+                    <td><?=$p['created_at']?></td>
+                    <td><a href="?action=del_post&id=<?=$p['pid']?>" class="fl red btn-sm" onclick="return confirm('确定删除该帖子及评论？')">删除</a></td>
+                </tr>
+            <?php endforeach; ?>
+        </table>
+    </div>
+<?php endif; ?>
+
+<?php if($tab === 'market'): ?>
+    <div class="card">
+        <h3>集市物品</h3>
+        <table>
+            <tr><th>ID</th><th>卖家</th><th>标题</th><th>价格</th><th>状态</th><th>操作</th></tr>
+            <?php foreach($markets as $m): ?>
+                <tr>
+                    <td><?=$m['id']?></td>
+                    <td><?=h($m['username'])?></td>
+                    <td><?=h($m['title'])?></td>
+                    <td><?=$m['price']?></td>
+                    <td><?=$m['status']?'在售':'已结束'?></td>
+                    <td><a href="?action=del_market&id=<?=$m['id']?>" class="fl red btn-sm" onclick="return confirm('确定删除该物品？')">删除</a></td>
+                </tr>
+            <?php endforeach; ?>
+        </table>
+    </div>
+<?php endif; ?>
+
+<?php if($tab === 'logs'): ?>
+    <div class="card">
+        <h3>IP 日志 (最近100条)</h3>
+        <table>
+            <tr><th>时间</th><th>UID</th><th>IP</th><th>路径</th></tr>
+            <?php foreach($logs as $l): ?>
+                <tr>
+                    <td><?=$l['created_at']?></td>
+                    <td><?=$l['uid'] ?: '-'?></td>
+                    <td><?=h($l['ip'])?></td>
+                    <td><?=h($l['path'])?></td>
+                </tr>
+            <?php endforeach; ?>
+        </table>
+    </div>
+<?php endif; ?>
+
+<?php page_end(); ?>onclick="document.getElementById('editModal').style.display='none'">取消</button>
                     <button type="submit" class="fl">保存</button>
                 </div>
             </form>

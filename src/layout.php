@@ -23,6 +23,9 @@ function page_head($title) {
 <?php }
 
 function page_end() {
-    echo '<div class="footer">© '.date('Y').' '.h(SITE_NAME).'</div>';
+    echo '<div class="footer">';
+    echo '© '.date('Y').' '.h(SITE_NAME);
+    echo ' · <a href="https://icp.ba4qzp.ampr.org" target="_blank" style="color:#888;text-decoration:underline;">📝 申请备案</a>';
+    echo '</div>';
     echo '<script src="assets/script.js"></script></body></html>';
 }

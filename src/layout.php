@@ -1,6 +1,6 @@
 <?php
 function page_head($title) {
-    global $urow;
+    global $urow, $pdo;
 ?><!DOCTYPE html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -8,6 +8,16 @@ function page_head($title) {
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/marked.min.js"></script>
 </head><body>
+
+<?php if(isset($urow) && $urow['is_admin']): 
+    $update_msg = check_for_updates($pdo);
+    if($update_msg): ?>
+        <div style="background:#fef3c7;color:#92400e;padding:10px;text-align:center;font-size:14px;border-bottom:1px solid #fcd34d;z-index:9999;position:relative;">
+            <?= $update_msg ?>
+        </div>
+    <?php endif; 
+endif; ?>
+
 <div class="nav">
     <b><?=h(SITE_NAME)?></b>
     <span style="float:right">

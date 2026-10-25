@@ -5,12 +5,21 @@ on:
     inputs:
       release_type:
         type: choice
-        description: '选择发版类型'
+        description: '发版类型'
         required: true
         options:
         - 正式版
         - 补丁版
         - 测试版
+      severity:
+        type: choice
+        description: '严重程度'
+        required: true
+        options:
+        - 更新
+        - 一般漏洞
+        - 高危漏洞
+        - 严重漏洞
 
 permissions:
   contents: write
@@ -26,13 +35,10 @@ jobs:
       - name: 自动计算版本号
         run: |
           git fetch --tags
-          
-          # 1. 获取所有纯净正式版，找最大的 BASE (如 v0.0.1)
           ALL_BASES=$(git tag -l "v*" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V)
           BASE=$(echo "$ALL_BASES" | tail -n 1)
           if [ -z "$BASE" ]; then BASE="v0.0.0"; fi
           
-          # 获取当前最大补丁版
           ALL_PATCHES=$(git tag -l "${BASE}.*" | grep -E "^${BASE}\.[0-9]{2}$" | sort -V)
           LATEST_PATCH=$(echo "$ALL_PATCHES" | tail -n 1)
           
@@ -50,7 +56,6 @@ jobs:
               NEW_TAG="v0.0.1"
             fi
             BASE=$NEW_TAG
-            
           elif [ "$TYPE" == "补丁版" ]; then
             if [ -z "$LATEST_PATCH" ]; then
               NEW_TAG="${BASE}.01"
@@ -60,22 +65,15 @@ jobs:
               NEW_NUM=$(printf "%02d" $NUM)
               NEW_TAG="${BASE}.${NEW_NUM}"
             fi
-            
           elif [ "$TYPE" == "测试版" ]; then
-            # 获取当前补丁号，如果没有就是 00
             if [ -z "$LATEST_PATCH" ]; then
               PATCH_NUM="00"
             else
               PATCH_NUM=${LATEST_PATCH##*.}
             fi
-            
-            # 获取当前日期 (例如 25)
             TODAY=$(date +%d)
-            
-            # 找今天该补丁号下已有的测试版，格式如 v0.0.1.01.251
             PREFIX="${BASE}.${PATCH_NUM}.${TODAY}"
             TEST_TAGS=$(git tag -l "${PREFIX}*" | sort -V)
-            
             if [ -z "$TEST_TAGS" ]; then
               NEW_TAG="${PREFIX}1"
             else
@@ -99,7 +97,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
-          name: "Release ${{ env.TAG }} (${{ github.event.inputs.release_type }})"
+          # ★ 自动在标题前缀加严重程度标记
+          name: "${{ github.event.inputs.severity == '严重漏洞' && '[CRITICAL] ' || (github.event.inputs.severity == '高危漏洞' && '[HIGH_BUG] ' || (github.event.inputs.severity == '一般漏洞' && '[LOW_BUG] ' || '[UPDATE] ')) }}Release ${{ env.TAG }} (${{ github.event.inputs.release_type }})"
           files: PCW-${{ env.VERSION }}.zip
           draft: true
           prerelease: ${{ github.event.inputs.release_type == '测试版' }}

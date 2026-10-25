@@ -8,12 +8,10 @@ foreach ($lines as $line) {
     list($name, $value) = explode('=', $line, 2);
     $name = trim($name); $value = trim($value, " \"'");
     $env[$name] = $value;
-    // 顺便也写进环境变量里，以防万一
     @putenv("{$name}={$value}"); 
     $_ENV[$name] = $value;
 }
 
-// 直接从数组读，绝对稳妥
 define('SITE_NAME', $env['SITE_NAME'] ?? 'PHPSchool');
 define('SITE_URL', $env['SITE_URL'] ?? 'http://localhost');
 define('ADMIN_EMAIL', $env['ADMIN_EMAIL'] ?? 'admin@example.com');
@@ -41,13 +39,15 @@ try{
         [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);
     $pdo->exec("SET time_zone = '+08:00'");
 }catch(PDOException $e){ 
-    // 这次如果还连不上，会把具体的错误（比如密码错误、主机找不到）印出来！
     die('数据库连接失败，详细原因：' . $e->getMessage() . '<br><br>请检查你的 .env 文件是否正确，或者删掉 .env 和 install.lock 重新安装。'); 
 }
 
 $super_uid = 0;
 try { $super_uid = (int)$pdo->query("SELECT MIN(uid) FROM users")->fetchColumn(); } catch (Exception $e) {}
 define('SUPER_UID', $super_uid ?: 1);
+
+// ★ 版本号 (测试版)
+define('APP_VERSION', 'v0.0.1-2610251');
 
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/layout.php';

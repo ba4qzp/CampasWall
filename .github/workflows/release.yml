@@ -3,6 +3,12 @@ name: Auto Release Zip
 on:
   release:
     types: [published]
+  workflow_dispatch: 
+    inputs:
+      version:
+        description: '【可选】指定版本号 (留空则自动使用最新 Tag，如 v0.0.1-01)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -12,20 +18,49 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+        with:
+          fetch-depth: 0 # 拉取完整的 git 历史，这样才能查最新的 tag
+
+      - name: 识别版本号
+        run: |
+          # 如果是发布 Release 触发的，直接用 tag 名字
+          if [ "${{ github.event_name }}" == "release" ]; then
+            RAW_VER="${{ github.ref_name }}"
+          else
+            # 如果是手动触发的
+            INPUT_VER="${{ github.event.inputs.version }}"
+            if [ -n "$INPUT_VER" ]; then
+              # 用户填了版本号
+              RAW_VER="$INPUT_VER"
+            else
+              # 用户没填，自动去 git 里找最新打的一个 tag
+              RAW_VER=$(git describe --tags `git rev-list --tags --max-count=1`)
+              echo "没填版本号，自动检测到最新 Tag: $RAW_VER"
+            fi
+          fi
+          
+          # 去掉开头的 v 用于 zip 文件名 (v0.0.1-01 -> 0.0.1-01)
+          CLEAN_VER="${RAW_VER#v}"
+          
+          # 确保 tag 名字是带 v 的（用于去 GitHub 找对应的 Release）
+          if [[ "$RAW_VER" != v* ]]; then
+            TAG_NAME="v${RAW_VER}"
+          else
+            TAG_NAME="${RAW_VER}"
+          fi
+          
+          echo "VERSION=$CLEAN_VER" >> $GITHUB_ENV
+          echo "TAG=$TAG_NAME" >> $GITHUB_ENV
+          echo "准备打包版本: $CLEAN_VER (对应 Tag: $TAG_NAME)"
+
       - name: 打包无壳 Zip (PCW)
         run: |
-          # 获取 tag 名称（例如 v0.0.1-01）
-          VERSION="${{ github.ref_name }}"
-          # 去掉开头的 v (变成 0.0.1-01)
-          CLEAN_VERSION="${VERSION#v}"
-          # 打包为 PCW-版本号.zip
-          zip -r "PCW-${CLEAN_VERSION}.zip" . -x "*.git*" "*.github*"
+          zip -r "PCW-${VERSION}.zip" . -x "*.git*" "*.github*"
           
       - name: 上传到 Release
         uses: softprops/action-gh-release@v2
         with:
-          # 这里用通配符匹配刚才打包好的 PCW-*.zip
-          files: PCW-*.zip
+          tag_name: ${{ env.TAG }}
+          files: PCW-${{ env.VERSION }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

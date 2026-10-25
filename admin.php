@@ -1,4 +1,5 @@
 <?php
+ini_set('display_errors', 1); error_reporting(E_ALL);
 require_once __DIR__ . '/src/init.php';
 
 if(empty($_SESSION['uid'])){ header('Location: index.php?action=login'); exit; }
@@ -27,9 +28,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         $grade = mb_substr(trim($_POST['grade'] ?? ''), 0, 20);
         $class_name = mb_substr(trim($_POST['class_name'] ?? ''), 0, 20);
         
-        $stmt = $pdo->prepare('SELECT points FROM users WHERE uid = ?'); 
-        $stmt->execute([$tid]); 
-        $old_points = (int)$stmt->fetchColumn();
+        $stmt = $pdo->prepare('SELECT points FROM users WHERE uid = ?'); $stmt->execute([$tid]); $old_points = (int)$stmt->fetchColumn();
         
         if($new_points !== $old_points){
             $delta = $new_points - $old_points;
@@ -39,19 +38,13 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             }
         }
         
-        $pdo->prepare('UPDATE users SET nickname=?, bio=?, gender=?, grade=?, class_name=? WHERE uid=?')
-            ->execute([$nickname, $bio, $gender, $grade, $class_name, $tid]);
-
-        if($new_pwd !== ''){
-            $pdo->prepare('UPDATE users SET password_hash = ? WHERE uid = ?')->execute([password_hash($new_pwd, PASSWORD_DEFAULT), $tid]);
-        }
+        $pdo->prepare('UPDATE users SET nickname=?, bio=?, gender=?, grade=?, class_name=? WHERE uid=?')->execute([$nickname, $bio, $gender, $grade, $class_name, $tid]);
+        if($new_pwd !== ''){ $pdo->prepare('UPDATE users SET password_hash = ? WHERE uid = ?')->execute([password_hash($new_pwd, PASSWORD_DEFAULT), $tid]); }
         $msg = '用户资料已更新';
     }
 }
 
 $action = $_GET['action'] ?? '';
-
-// ★ WAF 防拦截改造：delete -> remove，ban -> status，admin -> role
 
 if($action === 'remove_user' && isset($_GET['id']) && $is_super){
     $tid = (int)$_GET['id'];
@@ -62,65 +55,37 @@ if($action === 'remove_user' && isset($_GET['id']) && $is_super){
     }
     header('Location: admin.php?tab=users'); exit;
 }
-
 if($action === 'approve' && isset($_GET['id'])){
     $pdo->prepare('UPDATE users SET status = "active" WHERE uid = ?')->execute([(int)$_GET['id']]);
-    $pdo->prepare('INSERT INTO user_actions (uid, admin_uid, action, detail) VALUES (?,?,?,?)')->execute([(int)$_GET['id'], $uid, '注册通过', '你的注册申请已通过']);
     header('Location: admin.php'); exit;
 }
 if($action === 'reject' && isset($_GET['id'])){
     $pdo->prepare('DELETE FROM users WHERE uid = ? AND status = "pending"')->execute([(int)$_GET['id']]);
     header('Location: admin.php'); exit;
 }
-
-// 冻结/解冻 (原 toggle_ban)
 if($action === 'toggle_status' && isset($_GET['id'])){
     $tid = (int)$_GET['id'];
-    if($tid !== $uid){
-        $pdo->prepare('UPDATE users SET ng = 1 - ng WHERE uid = ?')->execute([$tid]);
-        $pdo->prepare('INSERT INTO user_actions (uid, admin_uid, action, detail) VALUES (?,?,?,?)')->execute([$tid, $uid, '账号状态变更', '你的账号冻结状态已被切换']);
-    }
+    if($tid !== $uid){ $pdo->prepare('UPDATE users SET ng = 1 - ng WHERE uid = ?')->execute([$tid]); }
     header('Location: admin.php'); exit;
 }
-
-// 提权/降权 (原 toggle_admin)
 if($action === 'toggle_role' && isset($_GET['id']) && $is_super){
     $tid = (int)$_GET['id'];
-    if($tid !== $uid && $tid !== (int)SUPER_UID){
-        $pdo->prepare('UPDATE users SET is_admin = 1 - is_admin WHERE uid = ?')->execute([$tid]);
-    }
+    if($tid !== $uid && $tid !== (int)SUPER_UID){ $pdo->prepare('UPDATE users SET is_admin = 1 - is_admin WHERE uid = ?')->execute([$tid]); }
     header('Location: admin.php'); exit;
 }
-
-// 删帖 (原 del_post)
 if($action === 'remove_post' && isset($_GET['id'])){
     $pid = (int)$_GET['id'];
-    $stmt = $pdo->prepare('SELECT uid FROM posts WHERE pid = ?'); $stmt->execute([$pid]); $post_owner = $stmt->fetchColumn();
-    if($post_owner !== false){
-        $pdo->prepare('DELETE FROM posts WHERE pid = ?')->execute([$pid]);
-        $pdo->prepare('DELETE FROM comments WHERE pid = ?')->execute([$pid]);
-        if($post_owner != $uid){
-            $pdo->prepare('INSERT INTO user_actions (uid, admin_uid, action, detail) VALUES (?,?,?,?)')->execute([$post_owner, $uid, '帖子被删除', '你的帖子因违规被管理员删除']);
-        }
-    }
+    $pdo->prepare('DELETE FROM posts WHERE pid = ?')->execute([$pid]);
+    $pdo->prepare('DELETE FROM comments WHERE pid = ?')->execute([$pid]);
     header('Location: admin.php?tab=posts'); exit;
 }
-
-// 删集市物品 (原 del_market)
 if($action === 'remove_market' && isset($_GET['id'])){
     $id = (int)$_GET['id'];
-    $stmt = $pdo->prepare('SELECT uid FROM market_items WHERE id = ?'); $stmt->execute([$id]); $m_owner = $stmt->fetchColumn();
-    if($m_owner !== false){
-        $pdo->prepare('DELETE FROM market_items WHERE id = ?')->execute([$id]);
-        if($m_owner != $uid){
-            $pdo->prepare('INSERT INTO user_actions (uid, admin_uid, action, detail) VALUES (?,?,?,?)')->execute([$m_owner, $uid, '集市物品被删除', '你的集市物品因违规被管理员删除']);
-        }
-    }
+    $pdo->prepare('DELETE FROM market_items WHERE id = ?')->execute([$id]);
     header('Location: admin.php?tab=market'); exit;
 }
 
 $tab = $_GET['tab'] ?? 'dashboard';
-
 $ann = $pdo->query('SELECT content FROM announcements WHERE aid = 1')->fetchColumn();
 $pending_users = $pdo->query('SELECT * FROM users WHERE status = "pending" ORDER BY uid ASC')->fetchAll();
 $users = $pdo->query('SELECT * FROM users ORDER BY uid DESC LIMIT 100')->fetchAll();
@@ -171,16 +136,15 @@ th { background: #fafafa; }
     <div class="card" style="border: 1px solid #f5c6cb; background: #fff8f8;">
         <h3 style="color:#c00">⚠️ 待审核用户</h3>
         <table>
-            <tr><th>UID</th><th>用户名</th><th>邮箱</th><th>注册时间</th><th>操作</th></tr>
+            <tr><th>UID</th><th>用户名</th><th>邮箱</th><th>操作</th></tr>
             <?php foreach($pending_users as $pu): ?>
                 <tr>
                     <td><?=$pu['uid']?></td>
                     <td><?=h($pu['username'])?></td>
                     <td><?=h($pu['email'])?></td>
-                    <td><?=$pu['created_at']?></td>
                     <td>
                         <a href="?action=approve&id=<?=$pu['uid']?>" class="fl green btn-sm">通过</a>
-                        <a href="?action=reject&id=<?=$pu['uid']?>" class="fl red btn-sm" onclick="return confirm('拒绝并删除该用户？')">拒绝</a>
+                        <a href="?action=reject&id=<?=$pu['uid']?>" class="fl red btn-sm">拒绝</a>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -195,7 +159,7 @@ th { background: #fafafa; }
             <?php foreach($users as $u): ?>
                 <tr>
                     <td><?=$u['uid']?> <?=$u['uid']==SUPER_UID?'<span class="badge-super">超管</span>':''?></td>
-                    <td><?=h($u['username'])?> <?=$u['is_admin']&&$u['uid']!=SUPER_UID?'<span class="badge-admin">管理</span>':''?></td>
+                    <td><?=h($u['username'])?></td>
                     <td><?=$u['points']?></td>
                     <td><?=$u['ng']?'<span style="color:red">冻结</span>':'<span style="color:green">正常</span>'?></td>
                     <td>
@@ -203,10 +167,100 @@ th { background: #fafafa; }
                             <a href="?action=toggle_status&id=<?=$u['uid']?>" class="fl gray btn-sm"><?=$u['ng']?'解冻':'冻结'?></a>
                             <?php if($is_super && $u['uid'] != SUPER_UID): ?>
                                 <a href="?action=toggle_role&id=<?=$u['uid']?>" class="fl btn-sm"><?=$u['is_admin']?'降权':'提权'?></a>
-                                <a href="?action=remove_user&id=<?=$u['uid']?>" class="fl red btn-sm" onclick="return confirm('确定彻底删除该用户及数据？不可恢复！')">删除</a>
+                                <a href="?action=remove_user&id=<?=$u['uid']?>" class="fl red btn-sm" onclick="return confirm('彻底删除？')">删除</a>
                             <?php endif; ?>
                         <?php endif; ?>
-                        <button class="btn-sm" onclick='editUser(<?=json_encode($u, JSON_HEX_APOS|JSON_HEX_QUOT)?>)'>修改</button>
+                        <!-- 用 data-* 属性传数据，避免 JS 引号转义引发的崩溃 -->
+                        <button class="btn-sm" 
+                            data-uid="<?=$u['uid']?>" data-name="<?=h($u['username'])?>" data-points="<?=$u['points']?>" 
+                            data-nickname="<?=h($u['nickname'])?>" data-bio="<?=h($u['bio'])?>"
+                            data-gender="<?=h($u['gender'] ?? 'secret')?>" data-grade="<?=h($u['grade'] ?? '')?>" data-class="<?=h($u['class_name'] ?? '')?>"
+                            onclick="editUser(this)">修改</button>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+        </table>
+    </div>
+    <div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);align-items:center;justify-content:center;z-index:999">
+        <div style="background:#fff;padding:20px;border-radius:8px;width:320px;max-height:90vh;overflow-y:auto;">
+            <h3 id="eu_title"></h3>
+            <form method="post">
+                <input type="hidden" name="mode" value="edit_user">
+                <input type="hidden" name="tid" id="eu_id">
+                <label>昵称</label><input type="text" name="nickname" id="eu_nickname" style="width:100%">
+                <label>积分</label><input type="number" name="points" id="eu_points" style="width:100%">
+                <label>简介</label><textarea name="bio" id="eu_bio" style="width:100%"></textarea>
+                <div style="display:flex;gap:10px;">
+                    <div style="flex:1"><label>性别</label><select name="gender" id="eu_gender" style="width:100%"><option value="secret">保密</option><option value="male">男生</option><option value="female">女生</option></select></div>
+                    <div style="flex:1"><label>年级</label><input type="text" name="grade" id="eu_grade" style="width:100%"></div>
+                    <div style="flex:1"><label>班级</label><input type="text" name="class_name" id="eu_class" style="width:100%"></div>
+                </div>
+                <label>重置密码 (留空不改)</label><input type="text" name="newpwd" style="width:100%">
+                <div style="margin-top:10px;text-align:right">
+                    <button type="button" class="fl gray" onclick="document.getElementById('editModal').style.display='none'">取消</button>
+                    <button type="submit" class="fl">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+    function editUser(btn){
+        document.getElementById('eu_id').value = btn.dataset.uid;
+        document.getElementById('eu_title').innerText = '修改: ' + btn.dataset.name;
+        document.getElementById('eu_points').value = btn.dataset.points;
+        document.getElementById('eu_nickname').value = btn.dataset.nickname;
+        document.getElementById('eu_bio').value = btn.dataset.bio;
+        document.getElementById('eu_gender').value = btn.dataset.gender;
+        document.getElementById('eu_grade').value = btn.dataset.grade;
+        document.getElementById('eu_class').value = btn.dataset.class;
+        document.getElementById('editModal').style.display = 'flex';
+    }
+    </script>
+<?php endif; ?>
+
+<?php if($tab === 'posts'): ?>
+    <div class="card">
+        <h3>最新帖子</h3>
+        <table>
+            <tr><th>PID</th><th>作者</th><th>内容</th><th>操作</th></tr>
+            <?php foreach($posts as $p): ?>
+                <tr>
+                    <td><?=$p['pid']?></td><td><?=h($p['username'])?></td><td><?=h(mb_substr($p['content'], 0, 30))?>...</td>
+                    <td><a href="?action=remove_post&id=<?=$p['pid']?>" class="fl red btn-sm" onclick="return confirm('删除？')">删除</a></td>
+                </tr>
+            <?php endforeach; ?>
+        </table>
+    </div>
+<?php endif; ?>
+
+<?php if($tab === 'market'): ?>
+    <div class="card">
+        <h3>集市物品</h3>
+        <table>
+            <tr><th>ID</th><th>卖家</th><th>标题</th><th>价格</th><th>操作</th></tr>
+            <?php foreach($markets as $m): ?>
+                <tr>
+                    <td><?=$m['id']?></td><td><?=h($m['username'])?></td><td><?=h($m['title'])?></td><td><?=$m['price']?></td>
+                    <td><a href="?action=remove_market&id=<?=$m['id']?>" class="fl red btn-sm" onclick="return confirm('删除？')">删除</a></td>
+                </tr>
+            <?php endforeach; ?>
+        </table>
+    </div>
+<?php endif; ?>
+
+<?php if($tab === 'logs'): ?>
+    <div class="card">
+        <h3>IP 日志</h3>
+        <table>
+            <tr><th>时间</th><th>UID</th><th>IP</th><th>路径</th></tr>
+            <?php foreach($logs as $l): ?>
+                <tr><td><?=$l['created_at']?></td><td><?=$l['uid'] ?: '-'?></td><td><?=h($l['ip'])?></td><td><?=h($l['path'])?></td></tr>
+            <?php endforeach; ?>
+        </table>
+    </div>
+<?php endif; ?>
+
+<?php page_end(); ?>-sm" onclick='editUser(<?=json_encode($u, JSON_HEX_APOS|JSON_HEX_QUOT)?>)'>修改</button>
                     </td>
                 </tr>
             <?php endforeach; ?>

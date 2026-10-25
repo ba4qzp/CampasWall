@@ -23,6 +23,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   build:
@@ -89,17 +91,41 @@ jobs:
           echo "VERSION=$CLEAN_VER" >> $GITHUB_ENV
           echo "✅ 计算完毕，准备打包: $NEW_TAG (类型: $TYPE)"
 
-      - name: 打包无壳 Zip (PCW)
+      # ★ 新增：自动把版本号写进 src/init.php
+      - name: 自动注入版本号到代码
         run: |
-          zip -r "PCW-${VERSION}.zip" . -x "*.git*" "*.github*"
+          # 匹配 define('APP_VERSION', 'v...');
+          sed -i "s/define('APP_VERSION', '.*');/define('APP_VERSION', 'v${VERSION}');/" src/init.php
+          echo "检查修改结果："
+          grep "APP_VERSION" src/init.php
+
+      - name: 打包无壳 Zip (PCW) 并计算 SHA256
+        run: |
+          ZIP_NAME="PCW-${VERSION}.zip"
+          zip -r "$ZIP_NAME" . -x "*.git*" "*.github*"
+          sha256sum "$ZIP_NAME" > "$ZIP_NAME.sha256"
+          cat "$ZIP_NAME.sha256"
+
+      - name: 生成官方来源证明 (Attestation)
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: 'PCW-${{ env.VERSION }}.zip'
+
+      - name: 下载证明文件
+        run: |
+          gh attestation download "PCW-${VERSION}.zip" -R ${{ github.repository }} -D ./
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 生成草稿 Release 并上传
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
-          # ★ 自动在标题前缀加严重程度标记
           name: "${{ github.event.inputs.severity == '严重漏洞' && '[CRITICAL] ' || (github.event.inputs.severity == '高危漏洞' && '[HIGH_BUG] ' || (github.event.inputs.severity == '一般漏洞' && '[LOW_BUG] ' || '[UPDATE] ')) }}Release ${{ env.TAG }} (${{ github.event.inputs.release_type }})"
-          files: PCW-${{ env.VERSION }}.zip
+          files: |
+            PCW-${{ env.VERSION }}.zip
+            PCW-${{ env.VERSION }}.zip.sha256
+            *.sigstore.json
           draft: true
           prerelease: ${{ github.event.inputs.release_type == '测试版' }}
         env:

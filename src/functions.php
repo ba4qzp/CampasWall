@@ -17,16 +17,13 @@ function ensure_dirs(){
 function show_name($u){ return !empty($u['nickname']) ? $u['nickname'] : ($u['username'] ?? '匿名'); }
 function is_image($name){ return in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), ['jpg','jpeg','png','gif','webp']); }
 
-// ★ 获取安全的头像路径，优先读取 docs/lls.jpg
 function get_avatar($user) {
     if (!empty($user['avatar']) && file_exists(__DIR__ . '/../' . $user['avatar'])) {
         return h($user['avatar']);
     }
-    // 默认使用 docs/lls.jpg
     if (file_exists(__DIR__ . '/../docs/lls.jpg')) {
         return 'docs/lls.jpg';
     }
-    // 如果连默认图都没有，回退到内置 SVG 防止裂图
     return 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23334155"/><circle cx="50" cy="40" r="18" fill="%2394a3b8"/><path d="M25 85c0-15 11-25 25-25s25 10 25 25" fill="%2394a3b8"/></svg>';
 }
 
@@ -68,7 +65,7 @@ function check_for_updates($pdo) {
 
     $cache_file = __DIR__ . '/../uploads/update_cache.json';
     $now = time();
-    $cache_time = 86400; 
+    $cache_time = 3600; // 1小时检查一次
 
     $data = null;
     if (file_exists($cache_file)) {
@@ -76,7 +73,7 @@ function check_for_updates($pdo) {
     }
 
     if (!$data || ($now - ($data['time'] ?? 0)) > $cache_time) {
-        $url = 'https://api.github.com/repos/BA4QZP/PHPSchool/releases/latest';
+        $url = 'https://api.github.com/repos/BA4QZP/PHPSchool/releases';
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -87,25 +84,121 @@ function check_for_updates($pdo) {
         curl_close($ch);
 
         if ($response) {
-            $json = json_decode($response, true);
-            if (isset($json['tag_name'])) {
-                $data = [
-                    'time' => $now,
-                    'tag' => $json['tag_name'],
-                    'url' => $json['html_url']
-                ];
-                @file_put_contents($cache_file, json_encode($data));
+            $releases = json_decode($response, true);
+            $latestStable = null;
+            $latestBeta = null;
+            if (is_array($releases)) {
+                foreach ($releases as $r) {
+                    if ($r['prerelease'] == false && !$latestStable) $latestStable = $r;
+                    if ($r['prerelease'] == true && !$latestBeta) $latestBeta = $r;
+                }
             }
+            $data = ['time' => $now, 'stable' => $latestStable, 'beta' => $latestBeta];
+            @file_put_contents($cache_file, json_encode($data));
         }
     }
 
-    if ($data && isset($data['tag'])) {
-        $remote_ver = ltrim($data['tag'], 'v');
-        $local_ver = ltrim(APP_VERSION, 'v');
-        
-        if ($remote_ver !== $local_ver) {
-            return "🚀 发现新版本 <b>{$data['tag']}</b>！<a href='{$data['url']}' target='_blank' style='color:#b45309;text-decoration:underline;font-weight:bold;'>前往 GitHub 下载更新</a>";
+    if (!$data) return false;
+    $local_ver = ltrim(APP_VERSION, 'v');
+    
+    if (!empty($data['stable']['tag_name'])) {
+        $remote_stable = ltrim($data['stable']['tag_name'], 'v');
+        if (version_compare($remote_stable, $local_ver, '>')) {
+            return ['type'=>'stable', 'tag'=>$data['stable']['tag_name'], 'url'=>$data['stable']['html_url'], 'zip_url'=>$data['stable']['zipball_url']];
+        }
+    }
+    if (!empty($data['beta']['tag_name'])) {
+        $remote_beta = ltrim($data['beta']['tag_name'], 'v');
+        if (version_compare($remote_beta, $local_ver, '>')) {
+            return ['type'=>'beta', 'tag'=>$data['beta']['tag_name'], 'url'=>$data['beta']['html_url'], 'zip_url'=>$data['beta']['zipball_url']];
         }
     }
     return false;
+}
+
+// ★ 静默自动更新引擎
+function try_silent_update($pdo) {
+    if (empty($_SESSION['uid']) || $_SESSION['uid'] != SUPER_UID) return;
+
+    $lock_file = __DIR__ . '/../uploads/update.lock';
+    if (file_exists($lock_file) && time() - filemtime($lock_file) < 300) return; // 5分钟内不重复尝试
+    
+    $info = check_for_updates($pdo);
+    if (!$info || $info['type'] !== 'stable') return; // 仅静默更新正式版/补丁
+
+    file_put_contents($lock_file, time());
+
+    if (!class_exists('ZipArchive')) {
+        file_put_contents(__DIR__ . '/../uploads/update_failed.json', json_encode(['msg' => '主机不支持 ZipArchive 扩展']));
+        @unlink($lock_file); return;
+    }
+
+    $zip_file = __DIR__ . '/../uploads/update_tmp.zip';
+    $fp = fopen($zip_file, 'w+');
+    $ch = curl_init($info['zip_url']);
+    curl_setopt($ch, CURLOPT_FILE, $fp);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'PHPSchool-Updater');
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 8); // 8秒下载限制
+    $success = curl_exec($ch);
+    curl_close($ch);
+    fclose($fp);
+
+    if (!$success || !file_exists($zip_file) || filesize($zip_file) < 1000) {
+        @unlink($zip_file);
+        file_put_contents(__DIR__ . '/../uploads/update_failed.json', json_encode(['msg' => '下载超时/网络错误']));
+        @unlink($lock_file); return;
+    }
+
+    $zip = new ZipArchive;
+    if ($zip->open($zip_file) === TRUE) {
+        $extract_path = __DIR__ . '/../uploads/update_extract';
+        if (is_dir($extract_path)) remove_dir_recursive($extract_path);
+        mkdir($extract_path, 0755, true);
+        $zip->extractTo($extract_path);
+        $zip->close();
+        @unlink($zip_file);
+
+        $files = scandir($extract_path);
+        $source_dir = $extract_path;
+        foreach($files as $f){
+            if($f != '.' && $f != '..' && is_dir($extract_path . '/' . $f)){ $source_dir = $extract_path . '/' . $f; break; }
+        }
+
+        copy_recursive_update($source_dir, __DIR__ . '/../');
+        remove_dir_recursive($extract_path);
+
+        file_put_contents(__DIR__ . '/../uploads/update_success.json', json_encode(['tag' => $info['tag']]));
+    } else {
+        @unlink($zip_file);
+        file_put_contents(__DIR__ . '/../uploads/update_failed.json', json_encode(['msg' => '解压失败']));
+    }
+    @unlink($lock_file);
+}
+
+function copy_recursive_update($src, $dst) {
+    $dir = opendir($src);
+    @mkdir($dst, 0755, true);
+    while(false !== ( $file = readdir($dir)) ) {
+        if (( $file != '.' ) && ( $file != '..' )) {
+            // 绝对保护：不覆盖配置和锁，也不动上传目录
+            if ($file == '.env' || $file == 'install.lock' || $file == 'uploads') continue;
+            if ( is_dir($src . '/' . $file) ) {
+                copy_recursive_update($src . '/' . $file, $dst . '/' . $file);
+            } else {
+                @copy($src . '/' . $file, $dst . '/' . $file);
+            }
+        }
+    }
+    closedir($dir);
+}
+
+function remove_dir_recursive($dir) {
+    if (!is_dir($dir)) return;
+    $files = array_diff(scandir($dir), array('.','..'));
+    foreach ($files as $file) {
+      (is_dir("$dir/$file")) ? remove_dir_recursive("$dir/$file") : unlink("$dir/$file");
+    }
+    rmdir($dir);
 }

@@ -91,12 +91,9 @@ jobs:
           echo "VERSION=$CLEAN_VER" >> $GITHUB_ENV
           echo "✅ 计算完毕，准备打包: $NEW_TAG (类型: $TYPE)"
 
-      # ★ 新增：自动把版本号写进 src/init.php
       - name: 自动注入版本号到代码
         run: |
-          # 匹配 define('APP_VERSION', 'v...');
           sed -i "s/define('APP_VERSION', '.*');/define('APP_VERSION', 'v${VERSION}');/" src/init.php
-          echo "检查修改结果："
           grep "APP_VERSION" src/init.php
 
       - name: 打包无壳 Zip (PCW) 并计算 SHA256
@@ -113,7 +110,8 @@ jobs:
 
       - name: 下载证明文件
         run: |
-          gh attestation download "PCW-${VERSION}.zip" -R ${{ github.repository }} -D ./
+          # 删除了 -D ./，默认下载到当前目录
+          gh attestation download "PCW-${VERSION}.zip" -R ${{ github.repository }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -4,7 +4,7 @@ $search = trim($_GET['q'] ?? '');
 $where = ['p.hidden = 0']; $params = [];
 if($search){ $where[] = '(p.content LIKE ? OR p.tags LIKE ?)'; $params[] = "%$search%"; $params[] = "%$search%"; }
 
-$sql = 'SELECT p.*, u.username, u.nickname, u.avatar FROM posts p JOIN users u ON p.uid = u.uid WHERE '.implode(' AND ', $where).' ORDER BY p.pid DESC LIMIT 200';
+$sql = 'SELECT p.*, u.username, u.nickname, u.avatar, u.gender, u.grade, u.class_name, u.show_info FROM posts p JOIN users u ON p.uid = u.uid WHERE '.implode(' AND ', $where).' ORDER BY p.pid DESC LIMIT 200';
 $stmt = $pdo->prepare($sql); $stmt->execute($params); $posts = $stmt->fetchAll();
 
 $pids = array_column($posts, 'pid'); $myLikes = []; $likeCounts = [];
@@ -45,17 +45,24 @@ page_head('首页'); ?>
     ?>
     <div class="post" id="p<?=$p['pid']?>">
         <div class="meta">
-            <?php if($p['is_anon']): ?><span class="anon-tag">匿名</span>
-            <?php else: ?><img src="<?=h($p['avatar'] ?: 'assets/default.png')?>"><a href="profile.php?uid=<?=$p['uid']?>"><?=h(show_name($p))?></a><?php endif; ?>
+            <?php if($p['is_anon']): ?>
+                <span class="anon-tag">匿名</span>
+            <?php else: ?>
+                <img src="<?=get_avatar($p)?>" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px;">
+                <a href="profile.php?uid=<?=$p['uid']?>"><?=h(show_name($p))?></a>
+                <?php if($p['show_info']): 
+                    $g_icon = $p['gender']=='male'?'♂':($p['gender']=='female'?'♀':'');
+                    $info = $g_icon . ($p['grade'] ? $p['grade'] : '') . ($p['class_name'] ? $p['class_name'] : '');
+                    if($info) echo "<span style='font-size:11px;color:#888;margin-left:5px;border:1px solid #ddd;padding:1px 4px;border-radius:4px;'>{$info}</span>";
+                endif; ?>
+            <?php endif; ?>
             · <?=h($p['created_at'])?>
             
             <span style="margin-left:auto">
                 <?php if($is_admin || $is_owner): ?>
-                    <!-- 开关评论区 -->
                     <a href="?action=toggle_comments&pid=<?=$p['pid']?>" style="color:var(--gray);margin-right:8px;">
                         <?=$p['closed'] ? '打开评论区' : '关闭评论区'?>
                     </a>
-                    <!-- 删帖 -->
                     <a href="?action=delete_post&pid=<?=$p['pid']?>" onclick="return confirm('删帖？')" style="color:red">删除帖子</a>
                 <?php endif; ?>
             </span>
@@ -80,7 +87,7 @@ page_head('首页'); ?>
                 <?php if($p['closed']): ?>
                     <p class="hint" style="color:#c00">评论区已关闭</p>
                 <?php else: 
-                    $cstmt = $pdo->prepare('SELECT c.*, u.username, u.nickname, u.avatar FROM comments c JOIN users u ON c.uid = u.uid WHERE c.pid = ? AND c.hidden = 0 ORDER BY c.cid ASC');
+                    $cstmt = $pdo->prepare('SELECT c.*, u.username, u.nickname, u.avatar, u.gender, u.grade, u.class_name, u.show_info FROM comments c JOIN users u ON c.uid = u.uid WHERE c.pid = ? AND c.hidden = 0 ORDER BY c.cid ASC');
                     $cstmt->execute([$p['pid']]);
                     while($c = $cstmt->fetch()):
                         $can_del_c = ($is_admin || $is_owner || ((int)$c['uid'] === $uid));
@@ -91,6 +98,11 @@ page_head('首页'); ?>
                                 <span class="anon-tag">匿名</span>
                             <?php else: ?>
                                 <b><?=h(show_name($c))?></b>
+                                <?php if($c['show_info']): 
+                                    $g_icon = $c['gender']=='male'?'♂':($c['gender']=='female'?'♀':'');
+                                    $info = $g_icon . ($c['grade'] ? $c['grade'] : '') . ($c['class_name'] ? $c['class_name'] : '');
+                                    if($info) echo "<span style='font-size:11px;color:#888;margin-left:5px;border:1px solid #ddd;padding:1px 4px;border-radius:4px;'>{$info}</span>";
+                                endif; ?>
                             <?php endif; ?>
                             ：<?=nl2br(h($c['content']))?>
                             <?php if($can_del_c): ?>

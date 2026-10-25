@@ -1,7 +1,34 @@
 <?php
 if(file_exists(__DIR__ . '/.env') && file_exists(__DIR__ . '/install.lock')){
-    die('系统已安装。如需重装，请删除 .env 和 install.lock。');
+    $upgrade_msg = '';
+    $env = [];
+    $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (strpos(trim($line), '#') === 0 || trim($line) === '') continue;
+        list($name, $value) = explode('=', $line, 2);
+        $env[trim($name)] = trim($value, " \"'");
+    }
+    
+    if(isset($env['DB_HOST'], $env['DB_NAME'], $env['DB_USER'])){
+        try {
+            $pdo = new PDO("mysql:host={$env['DB_HOST']};dbname={$env['DB_NAME']};charset=utf8mb4", $env['DB_USER'], $env['DB_PASS'] ?? '', [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
+            $cols = [];
+            $stmt = $pdo->query("SHOW COLUMNS FROM users");
+            while($row = $stmt->fetch(PDO::FETCH_ASSOC)) $cols[] = $row['Field'];
+            
+            $upgraded = false;
+            if(!in_array('gender', $cols)) { $pdo->exec("ALTER TABLE users ADD COLUMN gender VARCHAR(10) DEFAULT 'secret' AFTER bio"); $upgraded = true; }
+            if(!in_array('grade', $cols)) { $pdo->exec("ALTER TABLE users ADD COLUMN grade VARCHAR(20) DEFAULT '' AFTER gender"); $upgraded = true; }
+            if(!in_array('class_name', $cols)) { $pdo->exec("ALTER TABLE users ADD COLUMN class_name VARCHAR(20) DEFAULT '' AFTER grade"); $upgraded = true; }
+            if(!in_array('show_info', $cols)) { $pdo->exec("ALTER TABLE users ADD COLUMN show_info TINYINT(1) DEFAULT 0 AFTER class_name"); $upgraded = true; }
+            
+            if($upgraded) $upgrade_msg = '<h3 style="color:green">✅ 数据库结构已自动平滑升级成功！</h3><p>您可以直接去前台或后台体验新功能。</p>';
+            else $upgrade_msg = '<h3 style="color:blue">💡 系统已安装，且数据库结构已是最新，无需重复升级。</h3>';
+        } catch(Exception $e) { $upgrade_msg = '<h3 style="color:red">❌ 自动升级失败：' . $e->getMessage() . '</h3>'; }
+    }
+    die($upgrade_msg . '<p><a href="index.php">← 返回首页</a> | 如需彻底重装，请删除 .env 和 install.lock 文件</p>');
 }
+
 $step = $_GET['step'] ?? '1'; $msg = '';
 if($step === '2'){
     $db_host = $_POST['db_host'] ?? ''; $db_name = $_POST['db_name'] ?? '';
@@ -14,15 +41,15 @@ if($step === '2'){
     $require_email = isset($_POST['require_email']) ? 'true' : 'false';
     $limit_private_msg = isset($_POST['limit_private_msg']) ? 'true' : 'false';
 
-    if(!$admin_user || !$admin_pass) {
-        $msg = '<h3 style="color:red">失败：超管账号和密码不能为空！</h3>';
-    } else {
+    if(!$admin_user || !$admin_pass) { $msg = '<h3 style="color:red">失败：超管账号和密码不能为空！</h3>'; }
+    else {
         try {
             $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass, [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
             $sql = "
             CREATE TABLE IF NOT EXISTS users (
                 uid INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(20) UNIQUE NOT NULL, nickname VARCHAR(50) DEFAULT '', password_hash VARCHAR(255) NOT NULL,
                 email VARCHAR(100) DEFAULT '', email_verified TINYINT(1) DEFAULT 0, bio VARCHAR(500) DEFAULT '', avatar VARCHAR(255) DEFAULT '',
+                gender VARCHAR(10) DEFAULT 'secret', grade VARCHAR(20) DEFAULT '', class_name VARCHAR(20) DEFAULT '', show_info TINYINT(1) DEFAULT 0,
                 points INT DEFAULT 10000, is_admin TINYINT(1) DEFAULT 0, ng TINYINT(1) DEFAULT 0, status VARCHAR(20) DEFAULT 'active',
                 reg_ip VARCHAR(45) DEFAULT '', last_ip VARCHAR(45) DEFAULT '', username_changed_at DATETIME DEFAULT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

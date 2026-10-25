@@ -5,7 +5,7 @@ if(empty($_SESSION['uid'])){ header('Location: index.php?action=login'); exit; }
 $uid = (int)$_SESSION['uid'];
 $stmt = $pdo->prepare('SELECT * FROM users WHERE uid = ?'); $stmt->execute([$uid]); $urow = $stmt->fetch();
 if(!$urow || (int)$urow['is_admin'] !== 1){ die('无权访问后台'); }
-$is_super = ($uid === SUPER_UID);
+$is_super = ((int)$uid === (int)SUPER_UID);
 $msg = '';
 
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
@@ -26,7 +26,6 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         $stmt->execute([$tid]); 
         $old_points = (int)$stmt->fetchColumn();
         
-        // ★ 允许超管修改任何人（包括自己）的积分
         if($new_points !== $old_points){
             $delta = $new_points - $old_points;
             add_points($pdo, $tid, $delta, 'admin_adjust', $uid);
@@ -62,7 +61,7 @@ if($action === 'toggle_ban' && isset($_GET['id'])){
 }
 if($action === 'toggle_admin' && isset($_GET['id']) && $is_super){
     $tid = (int)$_GET['id'];
-    if($tid !== $uid && $tid !== SUPER_UID){
+    if($tid !== $uid && $tid !== (int)SUPER_UID){
         $pdo->prepare('UPDATE users SET is_admin = 1 - is_admin WHERE uid = ?')->execute([$tid]);
     }
     header('Location: admin.php'); exit;
@@ -177,7 +176,6 @@ th { background: #fafafa; }
                                 <a href="?action=toggle_admin&id=<?=$u['uid']?>" class="fl btn-sm"><?=$u['is_admin']?'降权':'提权'?></a>
                             <?php endif; ?>
                         <?php endif; ?>
-                        <!-- 超管可以修改自己的积分了 -->
                         <button class="btn-sm" onclick="editUser(<?=$u['uid']?>, '<?=h($u['username'])?>', <?=$u['points']?>)">修改</button>
                     </td>
                 </tr>
@@ -248,79 +246,6 @@ th { background: #fafafa; }
     </div>
 <?php endif; ?>
 
-<?php if($tab === 'logs'): ?>
-    <div class="card">
-        <h3>IP 日志 (最近100条)</h3>
-        <table>
-            <tr><th>时间</th><th>UID</th><th>IP</th><th>路径</th></tr>
-            <?php foreach($logs as $l): ?>
-                <tr>
-                    <td><?=$l['created_at']?></td>
-                    <td><?=$l['uid'] ?: '-'?></td>
-                    <td><?=h($l['ip'])?></td>
-                    <td><?=h($l['path'])?></td>
-                </tr>
-            <?php endforeach; ?>
-        </table>
-    </div>
-<?php endif; ?>
-
-<?php page_end(); ?>onclick="document.getElementById('editModal').style.display='none'">取消</button>
-                    <button type="submit" class="fl">保存</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    <script>
-    function editUser(id, name, pts){
-        document.getElementById('eu_id').value = id;
-        document.getElementById('eu_title').innerText = '修改用户: ' + name;
-        document.getElementById('eu_points').value = pts;
-        document.getElementById('editModal').style.display = 'flex';
-    }
-    </script>
-<?php endif; ?>
-
-<!-- 帖子管理 -->
-<?php if($tab === 'posts'): ?>
-    <div class="card">
-        <h3>最新帖子</h3>
-        <table>
-            <tr><th>PID</th><th>作者</th><th>内容 (截取)</th><th>时间</th><th>操作</th></tr>
-            <?php foreach($posts as $p): ?>
-                <tr>
-                    <td><?=$p['pid']?></td>
-                    <td><?=h($p['username'])?></td>
-                    <td><?=h(mb_substr($p['content'], 0, 30))?>...</td>
-                    <td><?=$p['created_at']?></td>
-                    <td><a href="?action=del_post&id=<?=$p['pid']?>" class="fl red btn-sm" onclick="return confirm('确定删除该帖子及评论？')">删除</a></td>
-                </tr>
-            <?php endforeach; ?>
-        </table>
-    </div>
-<?php endif; ?>
-
-<!-- 集市管理 -->
-<?php if($tab === 'market'): ?>
-    <div class="card">
-        <h3>集市物品</h3>
-        <table>
-            <tr><th>ID</th><th>卖家</th><th>标题</th><th>价格</th><th>状态</th><th>操作</th></tr>
-            <?php foreach($markets as $m): ?>
-                <tr>
-                    <td><?=$m['id']?></td>
-                    <td><?=h($m['username'])?></td>
-                    <td><?=h($m['title'])?></td>
-                    <td><?=$m['price']?></td>
-                    <td><?=$m['status']?'在售':'已结束'?></td>
-                    <td><a href="?action=del_market&id=<?=$m['id']?>" class="fl red btn-sm" onclick="return confirm('确定删除该物品？')">删除</a></td>
-                </tr>
-            <?php endforeach; ?>
-        </table>
-    </div>
-<?php endif; ?>
-
-<!-- 日志 -->
 <?php if($tab === 'logs'): ?>
     <div class="card">
         <h3>IP 日志 (最近100条)</h3>

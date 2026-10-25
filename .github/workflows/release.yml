@@ -4,20 +4,28 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
-      - name: 打包无壳 Zip
+      - name: 打包无壳 Zip (PCW)
         run: |
-          # 直接在当前根目录打包，排除 .git 和 .github
-          zip -r PHPSchool-${{ github.ref_name }}.zip . -x "*.git*" "*.github*"
+          # 获取 tag 名称（例如 v0.0.1-01）
+          VERSION="${{ github.ref_name }}"
+          # 去掉开头的 v (变成 0.0.1-01)
+          CLEAN_VERSION="${VERSION#v}"
+          # 打包为 PCW-版本号.zip
+          zip -r "PCW-${CLEAN_VERSION}.zip" . -x "*.git*" "*.github*"
           
       - name: 上传到 Release
         uses: softprops/action-gh-release@v2
         with:
-          files: PHPSchool-${{ github.ref_name }}.zip
+          # 这里用通配符匹配刚才打包好的 PCW-*.zip
+          files: PCW-*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

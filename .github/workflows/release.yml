@@ -1,13 +1,11 @@
 name: Auto Release Zip
 
 on:
-  release:
-    types: [published]
-  workflow_dispatch: 
+  workflow_dispatch:
     inputs:
       version:
-        description: '【可选】指定版本号 (留空则自动使用最新 Tag，如 v0.0.1-01)'
-        required: false
+        description: '填写版本号 (例如 v0.0.1-01，必填)'
+        required: true
         default: ''
 
 permissions:
@@ -18,31 +16,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # 拉取完整的 git 历史，这样才能查最新的 tag
 
-      - name: 识别版本号
+      - name: 处理版本号
         run: |
-          # 如果是发布 Release 触发的，直接用 tag 名字
-          if [ "${{ github.event_name }}" == "release" ]; then
-            RAW_VER="${{ github.ref_name }}"
-          else
-            # 如果是手动触发的
-            INPUT_VER="${{ github.event.inputs.version }}"
-            if [ -n "$INPUT_VER" ]; then
-              # 用户填了版本号
-              RAW_VER="$INPUT_VER"
-            else
-              # 用户没填，自动去 git 里找最新打的一个 tag
-              RAW_VER=$(git describe --tags `git rev-list --tags --max-count=1`)
-              echo "没填版本号，自动检测到最新 Tag: $RAW_VER"
-            fi
-          fi
+          RAW_VER="${{ github.event.inputs.version }}"
           
-          # 去掉开头的 v 用于 zip 文件名 (v0.0.1-01 -> 0.0.1-01)
+          # 如果没填版本号直接报错退出
+          if [ -z "$RAW_VER" ]; then
+            echo "❌ 错误：必须填写版本号！"
+            exit 1
+          fi
+
+          # 去掉开头的 v 用于 zip 文件名
           CLEAN_VER="${RAW_VER#v}"
           
-          # 确保 tag 名字是带 v 的（用于去 GitHub 找对应的 Release）
+          # 确保 tag 名字是带 v 的
           if [[ "$RAW_VER" != v* ]]; then
             TAG_NAME="v${RAW_VER}"
           else
@@ -56,11 +44,13 @@ jobs:
       - name: 打包无壳 Zip (PCW)
         run: |
           zip -r "PCW-${VERSION}.zip" . -x "*.git*" "*.github*"
-          
-      - name: 上传到 Release
+
+      - name: 生成草稿 Release 并上传
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
+          name: "Release ${{ env.TAG }}"
           files: PCW-${{ env.VERSION }}.zip
+          draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

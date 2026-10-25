@@ -1,0 +1,23 @@
+name: Auto Release Zip
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: 打包无壳 Zip
+        run: |
+          # 直接在当前根目录打包，排除 .git 和 .github
+          zip -r PHPSchool-${{ github.ref_name }}.zip . -x "*.git*" "*.github*"
+          
+      - name: 上传到 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: PHPSchool-${{ github.ref_name }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

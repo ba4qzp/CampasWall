@@ -1,47 +1,53 @@
-# CakePHP 3
-
-/vendor/*
-/config/app.php
-
-/tmp/cache/models/*
-!/tmp/cache/models/empty
-/tmp/cache/persistent/*
-!/tmp/cache/persistent/empty
-/tmp/cache/views/*
-!/tmp/cache/views/empty
-/tmp/sessions/*
-!/tmp/sessions/empty
-/tmp/tests/*
-!/tmp/tests/empty
-
-/logs/*
-!/logs/empty
-
-# CakePHP 2
-
-/app/tmp/*
-/app/Config/core.php
-/app/Config/database.php
-/vendors/*
-# 环境配置
+# ==============================
+# 1. PHP 环境与配置 (核心保护)
+# ==============================
 .env
 .env.local
 install.lock
 
-# 用户上传的文件（保留空文件夹即可）
+# 用户上传的文件（保留空文件夹占位）
 uploads/*
 !uploads/.gitkeep
 
-# 日志和临时文件
+# 运行时的自动更新缓存与锁
+update_cache.json
+update.lock
+update_tmp.zip
+update_extract/
+
+# PHP 日志与临时文件
 *.log
-*.cache
 tmp/
 
-# 操作系统
+# ==============================
+# 2. Android (App) 构建产物 (防仓库爆炸)
+# ==============================
+.gradle/
+build/
+app/build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# ==============================
+# 3. 签名文件 (绝对不可泄露)
+# ==============================
+*.jks
+*.keystore
+app/tulpa.jks
+release.jks
+
+# ==============================
+# 4. 操作系统与编辑器缓存
+# ==============================
 .DS_Store
 Thumbs.db
-
-# 编辑器
 .vscode/
 .idea/
+*.iml
 *.swp

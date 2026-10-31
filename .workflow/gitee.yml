@@ -1,0 +1,41 @@
+name: 自动切换为 Gitee 路径
+
+trigger:
+  push:
+      branches:
+            - main
+
+            jobs:
+              build:
+                  runs-on: ubuntu-latest
+                      steps:
+                            - name: Checkout Code
+                                    uses: actions/checkout@v4
+
+                                          - name: 替换为 Gitee 路径并推送
+                                                  run: |
+                                                            # ★ 你的专属 Token 已经写死在这里了
+                                                                      GITEE_TOKEN="b191c24f2321e52d80fde3b963dcf29f"
+                                                                                
+                                                                                          G_USER="BA4QZP"
+                                                                                                    G_REPO="PHPCampus"
+                                                                                                              GITEE_USER="ba4qzp"
+                                                                                                                        GITEE_REPO="PHPCampus"
+                                                                                                                                  
+                                                                                                                                            FILES=$(grep -rl "github.com/$G_USER/$G_REPO" . --exclude-dir=.git --exclude-dir=.github --exclude-dir=.gitee || true)
+                                                                                                                                                      
+                                                                                                                                                                if [ -n "$FILES" ]; then
+                                                                                                                                                                            for file in $FILES; do
+                                                                                                                                                                                          sed -i "s|github.com/$G_USER/$G_REPO|gitee.com/$GITEE_USER/$GITEE_REPO|g" "$file"
+                                                                                                                                                                                                      done
+                                                                                                                                                                                                                  
+                                                                                                                                                                                                                              git config --global user.name "Auto Bot"
+                                                                                                                                                                                                                                          git config --global user.email "bot@gitee.com"
+                                                                                                                                                                                                                                                      git add .
+                                                                                                                                                                                                                                                                  if ! git diff --staged --quiet; then
+                                                                                                                                                                                                                                                                                git commit -m "Auto-replace to Gitee links [skip ci]"
+                                                                                                                                                                                                                                                                                              git push https://oauth2:$GITEE_TOKEN@gitee.com/$GITEE_REPO.git HEAD:main
+                                                                                                                                                                                                                                                                                                          fi
+                                                                                                                                                                                                                                                                                                                    else
+                                                                                                                                                                                                                                                                                                                                echo "💡 已经是 Gitee 路径，无需替换"
+                                                                                                                                                                                                                                                                                                                                          fi

@@ -1,0 +1,70 @@
+name: Build Native APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: '版本代码 (必须是整数，每次更新必须填比上次大的数字，如 2)'
+        required: true
+        default: '1'
+      version_name:
+        description: '版本名称 (给人看的，如 1.0.1)'
+        required: true
+        default: '1.0.0'
+      app_label:
+        description: 'App 显示名称 (手机桌面上显示的名字)'
+        required: true
+        default: 'PHPCampus'
+      apk_filename:
+        description: '导出的 APK 文件名 (不需要加 .apk 后缀)'
+        required: true
+        default: 'PHPCampus-Release'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+        with:
+          gradle-version: 8.1.1
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/tulpa.jks
+
+      - name: Build Release APK
+        run: |
+          # 将填写的参数传给 Gradle
+          gradle assembleRelease \
+            -PappVersionCode="${{ github.event.inputs.version_code }}" \
+            -PappVersionName="${{ github.event.inputs.version_name }}" \
+            -PappLabel="${{ github.event.inputs.app_label }}" \
+            -Pandroid.injected.signing.store.file=$PWD/app/tulpa.jks \
+            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEYSTORE_PASSWORD }}
+
+      - name: Rename APK
+        run: |
+          # 把默认的 app-release.apk 重命名为你指定的名字
+          mv app/build/outputs/apk/release/app-release.apk \
+             app/build/outputs/apk/release/${{ github.event.inputs.apk_filename }}.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.inputs.apk_filename }}
+          path: app/build/outputs/apk/release/*.apk

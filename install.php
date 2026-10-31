@@ -137,7 +137,7 @@ if($step === '2'){
 <html>
 <head>
     <meta charset="utf-8">
-    <title>安装 PHPSchool</title>
+    <title>安装 PHPCampus</title>
     <style>
         body { font-family: sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; }
         input[type=text], input[type=email], input[type=password] { width: 100%; padding: 8px; margin: 5px 0 15px; box-sizing: border-box; }
@@ -146,13 +146,13 @@ if($step === '2'){
     </style>
 </head>
 <body>
-    <h2>安装 PHPSchool</h2>
+    <h2>安装 PHPCampus</h2>
     <?php echo $msg; ?>
     
     <?php if($step === '1'): ?>
     <form method="POST" action="install.php?step=2">
         <label>站点名称</label>
-        <input type="text" name="site_name" value="PHPSchool" required>
+        <input type="text" name="site_name" value="PHPCampus" required>
         <label>管理员邮箱</label>
         <input type="email" name="admin_email" value="admin@example.com" required>
         

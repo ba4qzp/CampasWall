@@ -1,18 +1,18 @@
-# PHPSchool
+# PHPCampus
 
 ![PHP](https://img.shields.io/badge/PHP-7.4%2B-blue)
 ![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Dependencies](https://img.shields.io/badge/Dependencies-Zero-brightgreen)
 
-PHPSchool 是一个基于原生 PHP 开发的极简校园墙 / 树洞系统。**无需 Composer，零外部依赖**，专为 InfinityFree 等免费虚拟主机设计，上传即可完成一键建站。
+PHPCampus 是一个基于原生 PHP 开发的极简校园墙 / 树洞系统。**无需 Composer，零外部依赖**，专为 InfinityFree 等免费虚拟主机设计，上传即可完成一键建站。
 
 ### 🚀 快速下载
-- [**⬇️ 下载最新版 (.zip)**](https://github.com/BA4QZP/PHPSchool/releases/latest) （前往 Releases 页面）
-- [**直接下载主分支源码**](https://github.com/BA4QZP/PHPSchool/archive/refs/heads/main.zip)
+- [**⬇️ 下载最新版 (.zip)**](https://github.com/BA4QZP/PHPCampus/releases/latest) （前往 Releases 页面）
+- [**直接下载主分支源码**](https://github.com/BA4QZP/PHPCampus/archive/refs/heads/main.zip)
 
 ### 🌐 在线演示
-[https://phpschool.gt.tc](https://phpschool.gt.tc)
+[https://phpcampus.gt.tc](https://phpcampus.gt.tc)
 
 ## ✨ 核心特性
 
@@ -46,4 +46,4 @@ PHPSchool 是一个基于原生 PHP 开发的极简校园墙 / 树洞系统。**
 
 ## 🤝 反馈与贡献
 
-如果你在部署或使用中遇到 Bug，欢迎提交 [Issue](https://github.com/BA4QZP/PHPSchool/issues)。如果是安全相关的漏洞，请直接联系作者。
+如果你在部署或使用中遇到 Bug，欢迎提交 [Issue](https://github.com/BA4QZP/PHPCampus/issues)。如果是安全相关的漏洞，请直接联系作者。

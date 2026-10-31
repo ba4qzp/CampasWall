@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PHPSchool - 极简校园墙</title>
+    <title>PHPCampus - 极简校园墙</title>
     <style>
         :root {
             --bg: #0f172a; --text: #f8fafc; --text-muted: #94a3b8;
@@ -70,12 +70,12 @@
             <div class="badge badge-loading" id="version-text">正在获取版本信息...</div>
         </div>
         
-        <h1>PHP<span>School</span></h1>
+        <h1>PHP<span>Campus</span></h1>
         <p class="subtitle">专为校园场景打造的轻量级树洞、匿名论坛与积分集市。极简架构，符合现代 Web 标准，上传即用。</p>
         
         <div class="btns" id="download-buttons">
-            <a href="https://phpschool.gt.tc" class="btn btn-demo" target="_blank">🌐 在线演示</a>
-            <a href="https://github.com/BA4QZP/PHPSchool" class="btn btn-primary">前往 GitHub 仓库</a>
+            <a href="https://phpcampus.gt.tc" class="btn btn-demo" target="_blank">🌐 在线演示</a>
+            <a href="https://github.com/BA4QZP/PHPCampus" class="btn btn-primary">前往 GitHub 仓库</a>
         </div>
 
         <div class="features">
@@ -107,15 +107,15 @@
     </div>
 
     <footer>
-        © 2026 PHPSchool · 基于 <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a> 开源<br>
+        © 2026 PHPCampus · 基于 <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a> 开源<br>
         注：本项目核心逻辑采用 AI 辅助生成，代码开源供学习交流。在生产环境部署前，建议进行充分的安全审计与测试。
     </footer>
 
     <script>
         async function fetchReleases() {
-            // 注意：如果你转移了仓库，这里的 repo 记得改成 新组织名/PHPSchool
-            const repo = 'BA4QZP/PHPSchool'; 
-            const demoUrl = 'https://phpschool.gt.tc';
+            // 注意：如果你转移了仓库，这里的 repo 记得改成 新组织名/PHPCampus
+            const repo = 'BA4QZP/PHPCampus'; 
+            const demoUrl = 'https://phpcampus.gt.tc';
             const badgesEl = document.getElementById('version-text');
             const btnsEl = document.getElementById('download-buttons');
             

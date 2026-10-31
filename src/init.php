@@ -12,7 +12,7 @@ foreach ($lines as $line) {
     $_ENV[$name] = $value;
 }
 
-define('SITE_NAME', $env['SITE_NAME'] ?? 'PHPSchool');
+define('SITE_NAME', $env['SITE_NAME'] ?? 'PHPCampus');
 define('SITE_URL', $env['SITE_URL'] ?? 'http://localhost');
 define('ADMIN_EMAIL', $env['ADMIN_EMAIL'] ?? 'admin@example.com');
 define('ALLOW_REGISTER', ($env['ALLOW_REGISTER'] ?? 'true') === 'true');

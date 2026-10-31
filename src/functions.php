@@ -73,11 +73,11 @@ function check_for_updates($pdo) {
     }
 
     if (!$data || ($now - ($data['time'] ?? 0)) > $cache_time) {
-        $url = 'https://api.github.com/repos/BA4QZP/PHPSchool/releases';
+        $url = 'https://api.github.com/repos/BA4QZP/PHPCampus/releases';
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'PHPSchool-Update-Checker');
+        curl_setopt($ch, CURLOPT_USERAGENT, 'PHPCampus-Update-Checker');
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_TIMEOUT, 3); 
         $response = curl_exec($ch);
@@ -166,7 +166,7 @@ function try_silent_update($pdo) {
     $ch = curl_init($info['zip_url']);
     curl_setopt($ch, CURLOPT_FILE, $fp);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'PHPSchool-Updater');
+    curl_setopt($ch, CURLOPT_USERAGENT, 'PHPCampus-Updater');
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_TIMEOUT, 8); 
     $success = curl_exec($ch);

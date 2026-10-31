@@ -52,7 +52,7 @@ class MainActivity : AppCompatActivity() {
     private fun showInputDialog(textView: TextView) {
         val input = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-            hint = "输入网址，如 http://phpschool.gt.tc"
+            hint = "输入网址，如 http://phpcampus.gt.tc"
         }
         AlertDialog.Builder(this)
             .setTitle("连接站点")

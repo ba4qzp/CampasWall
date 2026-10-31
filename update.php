@@ -26,7 +26,7 @@ $fp = fopen($zip_file, 'w+');
 $ch = curl_init($update_url);
 curl_setopt($ch, CURLOPT_FILE, $fp);
 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-curl_setopt($ch, CURLOPT_USERAGENT, 'PHPSchool-Updater');
+curl_setopt($ch, CURLOPT_USERAGENT, 'PHPCampus-Updater');
 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 下载给 60 秒
 $success = curl_exec($ch);
@@ -41,7 +41,7 @@ if(!$success || filesize($zip_file) < 1000){
 // 解压并覆盖
 $zip = new ZipArchive;
 if ($zip->open($zip_file) === TRUE) {
-    // GitHub 的 zipball 里面会带个文件夹 (例如 PHPSchool-xxx/)
+    // GitHub 的 zipball 里面会带个文件夹 (例如 PHPCampus-xxx/)
     // 我们需要把里面的文件提出来
     $extract_path = __DIR__ . '/update_extract';
     if(!is_dir($extract_path)) mkdir($extract_path, 0755, true);

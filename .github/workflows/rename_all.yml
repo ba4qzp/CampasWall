@@ -1,0 +1,66 @@
+name: 暴力全局改名
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  replace:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 暴力替换并提交
+        run: |
+          # 1. 找出所有包含目标词汇的文件 (排除 .git 和 .github)
+          # 注意：这里连 php、html、md、kt 都不限，只要是文本文件就查！
+          FILES=$(grep -rl -E "PHPSchool|phpschool|<span>School</span>" . --exclude-dir=.git --exclude-dir=.github || true)
+          
+          if [ -z "$FILES" ]; then
+            echo "💡 没找到需要替换的文件，可能已经是改名后的状态。"
+            exit 0
+          fi
+          
+          echo "发现以下文件需要替换："
+          echo "$FILES"
+          
+          # 2. 逐个文件进行无死角替换
+          for file in $FILES; do
+            # 大小写替换
+            sed -i 's/PHPSchool/PHPCampus/g' "$file"
+            sed -i 's/phpschool/phpcampus/g' "$file"
+            sed -i 's/PHPSCHOOL/PHPCAMPUS/g' "$file"
+            
+            # 专门处理 HTML 里被 span 隔开的标题
+            sed -i 's|<span>School</span>|<span>Campus</span>|g' "$file"
+            sed -i 's|<span>school</span>|<span>campus</span>|g' "$file"
+          done
+          
+          # 3. 提交更改
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add .
+          
+          # 检查是否真的有变更
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: 暴力无死角替换所有旧名称"
+            git push
+            echo "✅ 替换成功并已推送！"
+          else
+            echo "⚠️ 匹配到了文件，但内容没有发生改变（可能被某些规则忽略了）。"
+          fi
+
+      - name: 自动销毁工作流
+        if: always() # 无论上面成功还是失败，都要把文件删了
+        run: |
+          WORKFLOW_PATH=$(echo "${{ github.workflow_ref }}" | cut -d'@' -f1 | sed 's|^[^/]*/[^/]*/||')
+          gh api --method DELETE repos/${{ github.repository }}/contents/$WORKFLOW_PATH \
+            -f message="Auto-destroy: Rename finished" \
+            -f sha=$(gh api repos/${{ github.repository }}/contents/$WORKFLOW_PATH --jq .sha)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

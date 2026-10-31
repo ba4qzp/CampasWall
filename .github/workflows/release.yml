@@ -20,6 +20,10 @@ on:
         - 一般漏洞
         - 高危漏洞
         - 严重漏洞
+      custom_version:
+        description: '【可选】手动指定基础版本号（如 v0.1.0 或 v1.0.0），留空则自动推算'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -40,51 +44,64 @@ jobs:
       - name: 自动计算版本号
         run: |
           git fetch --tags
-          ALL_BASES=$(git tag -l "v*" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V)
-          BASE=$(echo "$ALL_BASES" | tail -n 1)
-          if [ -z "$BASE" ]; then BASE="v0.0.0"; fi
-          ALL_PATCHES=$(git tag -l "${BASE}.*" | grep -E "^${BASE}\.[0-9]{2}$" | sort -V)
-          LATEST_PATCH=$(echo "$ALL_PATCHES" | tail -n 1)
+          
+          CUSTOM_VER="${{ github.event.inputs.custom_version }}"
           TYPE="${{ github.event.inputs.release_type }}"
           
-          if [ "$TYPE" == "正式版" ]; then
-            if [ -n "$BASE" ]; then
-              V_NUM=${BASE#v}
-              MAJOR=$(echo $V_NUM | cut -d. -f1)
-              MINOR=$(echo $V_NUM | cut -d. -f2)
-              PATCH=$(echo $V_NUM | cut -d. -f3)
-              NEW_PATCH=$((PATCH + 1))
-              NEW_TAG="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+          # ★ 优先处理手动指定的跨版本号
+          if [ -n "$CUSTOM_VER" ]; then
+            if [[ "$CUSTOM_VER" != v* ]]; then
+              NEW_TAG="v${CUSTOM_VER}"
             else
-              NEW_TAG="v0.0.1"
+              NEW_TAG="${CUSTOM_VER}"
             fi
-            BASE=$NEW_TAG
-          elif [ "$TYPE" == "补丁版" ]; then
-            if [ -z "$LATEST_PATCH" ]; then
-              NEW_TAG="${BASE}.01"
-            else
-              NUM=${LATEST_PATCH##*.}
-              NUM=$((10#$NUM + 1))
-              NEW_NUM=$(printf "%02d" $NUM)
-              NEW_TAG="${BASE}.${NEW_NUM}"
-            fi
-          elif [ "$TYPE" == "测试版" ]; then
-            if [ -z "$LATEST_PATCH" ]; then PATCH_NUM="00"; else PATCH_NUM=${LATEST_PATCH##*.}; fi
-            TODAY=$(date +%d)
-            PREFIX="${BASE}.${PATCH_NUM}.${TODAY}"
-            TEST_TAGS=$(git tag -l "${PREFIX}*" | sort -V)
-            if [ -z "$TEST_TAGS" ]; then NEW_TAG="${PREFIX}1"; else
-              LAST_TEST=$(echo "$TEST_TAGS" | tail -n 1)
-              NUM=${LAST_TEST##*${TODAY}}
-              NUM=$((10#$NUM + 1))
-              NEW_TAG="${PREFIX}${NUM}"
+            echo "✅ 使用了手动指定的版本号: $NEW_TAG"
+          else
+            # 原有自动推算逻辑
+            ALL_BASES=$(git tag -l "v*" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V)
+            BASE=$(echo "$ALL_BASES" | tail -n 1)
+            if [ -z "$BASE" ]; then BASE="v0.0.0"; fi
+            ALL_PATCHES=$(git tag -l "${BASE}.*" | grep -E "^${BASE}\.[0-9]{2}$" | sort -V)
+            LATEST_PATCH=$(echo "$ALL_PATCHES" | tail -n 1)
+            
+            if [ "$TYPE" == "正式版" ]; then
+              if [ -n "$BASE" ]; then
+                V_NUM=${BASE#v}
+                MAJOR=$(echo $V_NUM | cut -d. -f1)
+                MINOR=$(echo $V_NUM | cut -d. -f2)
+                PATCH=$(echo $V_NUM | cut -d. -f3)
+                NEW_PATCH=$((PATCH + 1))
+                NEW_TAG="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+              else
+                NEW_TAG="v0.0.1"
+              fi
+            elif [ "$TYPE" == "补丁版" ]; then
+              if [ -z "$LATEST_PATCH" ]; then
+                NEW_TAG="${BASE}.01"
+              else
+                NUM=${LATEST_PATCH##*.}
+                NUM=$((10#$NUM + 1))
+                NEW_NUM=$(printf "%02d" $NUM)
+                NEW_TAG="${BASE}.${NEW_NUM}"
+              fi
+            elif [ "$TYPE" == "测试版" ]; then
+              if [ -z "$LATEST_PATCH" ]; then PATCH_NUM="00"; else PATCH_NUM=${LATEST_PATCH##*.}; fi
+              TODAY=$(date +%d)
+              PREFIX="${BASE}.${PATCH_NUM}.${TODAY}"
+              TEST_TAGS=$(git tag -l "${PREFIX}*" | sort -V)
+              if [ -z "$TEST_TAGS" ]; then NEW_TAG="${PREFIX}1"; else
+                LAST_TEST=$(echo "$TEST_TAGS" | tail -n 1)
+                NUM=${LAST_TEST##*${TODAY}}
+                NUM=$((10#$NUM + 1))
+                NEW_TAG="${PREFIX}${NUM}"
+              fi
             fi
           fi
           
           CLEAN_VER="${NEW_TAG#v}"
           echo "TAG=$NEW_TAG" >> $GITHUB_ENV
           echo "VERSION=$CLEAN_VER" >> $GITHUB_ENV
-          echo "✅ 准备打包: $NEW_TAG"
+          echo "✅ 最终准备打包: $NEW_TAG"
 
       - name: 自动注入版本号到代码
         run: |
@@ -122,7 +139,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ==========================================
-  # Job 2: 全量测试（独立运行）
+  # Job 2: 全量测试
   # ==========================================
   test:
     runs-on: ubuntu-latest
@@ -152,31 +169,40 @@ jobs:
       run: |
         php -S 127.0.0.1:8000 &
         sleep 5
-        curl -s -X POST -d "site_name=TestSite&admin_email=a@b.com&admin_user=admin&admin_pass=123456&db_host=127.0.0.1&db_name=phpschool_test&db_user=root&db_pass=root&allow_register=on&require_approval=on&limit_private_msg=on" "http://127.0.0.1:8000/install.php?step=2" > install_res.html
+        cat <<EOF > install_data.txt
+        site_name=TestSite
+        admin_email=a@b.com
+        admin_user=admin
+        admin_pass=123456
+        db_host=127.0.0.1
+        db_name=phpschool_test
+        db_user=root
+        db_pass=root
+        allow_register=on
+        require_approval=on
+        limit_private_msg=on
+        EOF
+        
+        curl -s -X POST -d @install_data.txt "http://127.0.0.1:8000/install.php?step=2" > install_res.html
         if [ ! -f .env ]; then cat install_res.html; exit 1; fi
         echo "✅ 安装成功"
-        
-        # ★ 直接通过 PHP 重置密码，完美避开 Bash 对 $ 的解析雷区
-        php -r "
-        try {
-            \$pdo = new PDO('mysql:host=127.0.0.1;dbname=phpschool_test', 'root', 'root');
-            \$hash = password_hash('123456', PASSWORD_DEFAULT);
-            \$pdo->exec(\"UPDATE users SET status='active', password_hash='\$hash' WHERE username='admin'\");
-            echo '✅ 密码强制重置成功' . PHP_EOL;
-        } catch(Exception \$e) {
-            echo '❌ 密码重置失败: ' . \$e->getMessage() . PHP_EOL;
-            exit(1);
-        }
-        "
 
     - name: 1. 账号模块
       run: |
-        curl -s -X POST -d "username=user1&pwd=123456&email=u@t.com" "http://127.0.0.1:8000/index.php?action=register" > /dev/null
+        cat <<EOF > reg_data.txt
+        username=user1
+        pwd=123456
+        email=u@t.com
+        EOF
+        curl -s -X POST -d @reg_data.txt "http://127.0.0.1:8000/index.php?action=register" > /dev/null
         STATUS=$(mysql -h 127.0.0.1 -u root -proot phpschool_test -N -e "SELECT status FROM users WHERE username='user1'" | tr -d '\r\n')
         if [ "$STATUS" != "pending" ]; then echo "❌ 注册状态异常: $STATUS"; exit 1; fi
         
-        # 用 password 代替 pwd，防止被 GitHub Actions 打码屏蔽
-        curl -s -c admin_cookie.txt -X POST -d "username=admin&password=123456" "http://127.0.0.1:8000/index.php?action=login" > login_res.html
+        cat <<EOF > login_data.txt
+        username=admin
+        password=123456
+        EOF
+        curl -s -c admin_cookie.txt -X POST -d @login_data.txt "http://127.0.0.1:8000/index.php?action=login" > login_res.html
         if ! grep -q "PHPSESSID" admin_cookie.txt; then echo "❌ admin 登录失败"; cat login_res.html; exit 1; fi
         
         curl -s -b admin_cookie.txt "http://127.0.0.1:8000/admin.php?action=approve&id=2" > /dev/null
@@ -226,6 +252,12 @@ jobs:
         if [ "$NG" != "1" ]; then echo "❌ 后台操作失败"; exit 1; fi
         
         curl -s "http://127.0.0.1:8000/install.php" > upgrade_res.html
+        if ! grep -q "升级成功\|已是最新" upgrade_res.html; then 
+            echo "❌ 平滑升级验证失败"
+            cat upgrade_res.html
+            exit 1; 
+        fi
+        echo "✅ 后台与升级模块通过"0.0.1:8000/install.php" > upgrade_res.html
         if ! grep -q "升级成功\|已是最新" upgrade_res.html; then 
             echo "❌ 平滑升级验证失败"
             cat upgrade_res.html

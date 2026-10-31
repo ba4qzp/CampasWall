@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.phpcampus.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.phpcampus.app"
+        minSdk 24
+        targetSdk 34
+        
+        // 接收 GitHub Actions 传进来的参数，如果没传则用默认值
+        versionCode project.hasProperty('appVersionCode') ? project.appVersionCode.toInteger() : 1
+        versionName project.hasProperty('appVersionName') ? project.appVersionName : "1.0.0"
+        
+        // 动态替换 App 在桌面上的名字
+        resValue "string", "app_name", project.hasProperty('appLabel') ? project.appLabel : "PHPCampus"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.core:core-ktx:1.10.1'
+}

@@ -1,0 +1,44 @@
+name: 自动切换为 GitHub 路径
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  replace:
+    runs-on: ubuntu-latest
+    # ★ 关键：如果上一次提交是脚本自动替换的，就跳过，防止死循环
+    if: "!contains(github.event.head_commit.message, 'Auto-replace to GitHub')"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 替换为 GitHub 路径并提交
+        run: |
+          G_USER="BA4QZP"
+          G_REPO="PHPCampus"
+          GITEE_USER="ba4qzp"
+          GITEE_REPO="PHPCampus"
+          
+          # 查找所有包含 gitee.com 的文件
+          FILES=$(grep -rl "gitee.com/$GITEE_USER/$GITEE_REPO" . --exclude-dir=.git --exclude-dir=.github --exclude-dir=.gitee || true)
+          
+          if [ -n "$FILES" ]; then
+            for file in $FILES; do
+              sed -i "s|gitee.com/$GITEE_USER/$GITEE_REPO|github.com/$G_USER/$G_REPO|g" "$file"
+            done
+            
+            git config --global user.name "Auto Bot"
+            git config --global user.email "bot@github.com"
+            git add .
+            if ! git diff --staged --quiet; then
+              # ★ 加上 [skip ci] 防止触发其他流水线
+              git commit -m "Auto-replace to GitHub links [skip ci]"
+              git push
+            fi
+          fi
